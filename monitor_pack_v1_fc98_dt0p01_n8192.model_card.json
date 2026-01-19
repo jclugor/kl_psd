@@ -1,0 +1,55 @@
+{
+  "schema_version": "model_card_v1",
+  "model_version": "monitor_pack_v1_fc98_dt0p01_n8192",
+  "contracts": {
+    "welch": {
+      "fc_hz": 98000000.0,
+      "dt_acq_s": 0.01,
+      "nperseg": 8192,
+      "noverlap": 4096,
+      "window": "hann",
+      "detrend": false,
+      "average": "mean"
+    },
+    "frequency_grid": {
+      "M": 8192,
+      "f_hz_start": 88000000.0,
+      "f_hz_stop": 107997558.59375,
+      "df_hz_mean": 2441.40625,
+      "df_hz_min": 2441.40625,
+      "df_hz_max": 2441.40625,
+      "ordering": "fftshifted (centered), RF = fc + f_bb"
+    },
+    "units": {
+      "psd": "linear (power/Hz), not dB",
+      "noise_floor_snf": "linear PSD (power/Hz)",
+      "sigma_eps": "linear PSD (power/Hz) likelihood scale"
+    }
+  },
+  "basis": {
+    "R": 20,
+    "Phi_KL_shape": [
+      8192,
+      20
+    ],
+    "weights_shape": [
+      8192
+    ]
+  },
+  "kernel_params": {
+    "ell_short_hz": 1999.9999999999998,
+    "ell_long_hz": 40001991.95697724,
+    "a1": 999.9997310972949,
+    "a2": 0.0010000003570004407,
+    "sigma_eps": 4.399449386070043e-13
+  },
+  "online_defaults": {
+    "p_fa_bin": 0.001,
+    "pi0": 0.95,
+    "snf_estimation": "quiet_frac median in lowest-quantile PSD bins (unless snf provided)"
+  },
+  "notes": [
+    "Online Welch configuration must match this card exactly.",
+    "If the online IQ produces a different frequency grid, resample PSD to f_hz or reject."
+  ]
+}

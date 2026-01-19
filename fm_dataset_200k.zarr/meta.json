@@ -1,0 +1,7 @@
+{
+  "N": 500,
+  "num_samples": 200000,
+  "M": 8192,
+  "format": "zarr+jsonl",
+  "iq_dtype": "complex64 (stored as float32 re/im)"
+}

@@ -1,2 +1,71 @@
 .venv
 __pycache__
+# LaTeX intermediate files
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.brf
+*.idx
+*.ilg
+*.ind
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.fls
+*.fdb_latexmk
+
+# latexmk
+*.dvi
+*.xdv
+*.nav
+*.snm
+
+# Glossaries
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.ist
+
+# Nomenclature
+*.nlo
+*.nls
+
+# TikZ / PGF
+*.dpth
+*.md5
+
+# minted (Pygments)
+_minted*
+*.pyg
+
+# Makeindex
+*.idx
+*.ind
+*.ilg
+
+# PDF output (optional – remove if you want to track PDFs)
+# *.pdf
+
+# Backup files
+*~
+*.bak
+*.backup
+*.swp
+*.tmp
+
+# Mac / Windows system files
+.DS_Store
+Thumbs.db
+
+# Build directories (if you compile into a folder like build/)
+build/
+out/
+dist/

@@ -1,0 +1,33 @@
+{
+  "tag": "RUN:run_current:best",
+  "weights": {
+    "encoder": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\VAE_implementation\\models\\runs\\run_current\\enc_best.weights.h5",
+    "decoder": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\VAE_implementation\\models\\runs\\run_current\\dec_best.weights.h5"
+  },
+  "data": {
+    "processed_dir": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\data\\processed\\psd_1024",
+    "npz": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\data\\processed\\psd_1024\\dataset_psd_1024_norm.npz",
+    "X_test_shape": [
+      96,
+      1024,
+      1
+    ],
+    "normalize_meta": {
+      "npz_path": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\data\\processed\\psd_1024\\dataset_psd_1024_norm.npz",
+      "gmin": -31.256715774536133,
+      "gmax": 5.902835845947266,
+      "normalize_mode": "global_minmax"
+    }
+  },
+  "losses": {
+    "beta_used_for_reporting": 1.0,
+    "recon_loss": 0.19249995052814484,
+    "kl_loss": 0.014009433798491955,
+    "total_loss": 0.2065093843266368
+  },
+  "peak_metrics": {
+    "topk": 32,
+    "topk_peak_mse": 0.0008925516158342361,
+    "peak_bias_mean_recon_minus_orig": -0.002885734662413597
+  }
+}

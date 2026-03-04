@@ -69,3 +69,34 @@ Thumbs.db
 build/
 out/
 dist/
+
+# ============================================================
+# VAE / ML artifacts (local-only)
+# ============================================================
+
+# Raw datasets (cloned repos) - DO NOT COMMIT
+data/raw/
+data/raw/**
+
+# Preprocessed datasets - DO NOT COMMIT
+data/processed/
+data/processed/**
+
+# Numpy / compressed arrays (if generated elsewhere too)
+*.npy
+*.npz
+
+# Model artifacts / checkpoints / logs - DO NOT COMMIT
+VAE_implementation/models/
+VAE_implementation/models/**
+**/*.weights.h5
+**/*.keras
+**/logs/
+**/backup/
+**/history.csv
+**/last_epoch.txt
+**/best_val_loss.json
+**/best_info.json
+
+# TensorBoard
+events.out.tfevents.*

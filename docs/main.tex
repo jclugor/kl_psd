@@ -1,0 +1,249 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{iftex}
+\ifPDFTeX
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\else
+\usepackage{fontspec}
+\usepackage{unicode-math}
+\setmainfont{DejaVu Serif}
+\setmathfont{STIX Math}
+\fi
+
+\usepackage{amsmath,amssymb,bm}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{fancyvrb}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc,shapes.symbols,shapes.geometric}
+
+\title{Neural Compression for Power Spectral Density}
+\author{Martín Ramírez Espinosa, Sergio Alejandro Gil Ríos}
+\date{February 2026}
+
+\begin{document}
+\maketitle
+
+\bigskip
+\section{Introduction}
+Wideband spectrum monitoring based on low-cost Software Defined Radios (SDRs) is a practical approach to assess occupancy in the FM broadcast band and to support regulatory and operational compliance tasks. In these systems, a sensing node continuously acquires complex baseband samples, computes spectral features (in particular, a Power Spectral Density (PSD) estimate), and reports results to a remote server for visualization and decision-making.
+
+A key bottleneck is communication and storage: sending raw I/Q streams or high-resolution PSD frames at high cadence can easily exceed uplink capacity and backend storage/processing budgets. This work formulates PSD compression as a rate--distortion problem and proposes a VQ-VAE-based system model that learns a compact discrete representation (bitstream) of the PSD while preserving the quantities used for FM spectrum sensing, such as occupancy maps and emission-related features.
+
+\section{Problem Formulation}
+
+\subsection{System model}
+We consider a sensing node that, at discrete time instants $t$, computes a PSD estimate of a received process $x(t)$ over a band of interest. Denote by
+\begin{equation}
+\mathbf{S}_t \triangleq \big[S_t(\omega_1),\ldots,S_t(\omega_N)\big]^\top \in \mathbb{R}_+^N
+\end{equation}
+the discretized PSD sampled on a uniform frequency grid $\{\omega_n\}_{n=1}^N$ covering the monitored band. The node must transmit a compressed description of $\mathbf{S}_t$ to a cloud service under a bitrate budget, where the cloud reconstructs $\hat{\mathbf{S}}_t$ and performs spectrum-sensing analytics.
+
+\vspace{2mm}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  >=Latex,
+  node distance=16mm and 14mm,
+  block/.style={
+    draw, thick, rounded corners,
+    align=center,
+    minimum height=10mm,
+    minimum width=28mm
+  },
+  cloudnode/.style={
+    draw, thick,
+    cloud, cloud puffs=12, cloud puff arc=120,
+    aspect=2,
+    align=center,
+    minimum width=28mm,
+    minimum height=12mm
+  },
+  db/.style={
+    draw, thick,
+    cylinder, shape border rotate=90,
+    aspect=0.35,
+    align=center,
+    minimum height=12mm,
+    minimum width=16mm
+  },
+  line/.style={-Latex, thick}
+]
+
+% Nodes (main chain)
+\node[block, draw=none, fill=none] (bb) {\Large $S_x(\omega)$};
+
+\node[block, right=of bb] (dec1) {Decimation\\$\downarrow\,K/M$};
+
+\node[block, right=of dec1] (std) {Standardization};
+
+\node[block, right=of std] (nl1) {Non-linear\\Transformation};
+
+\node[block, right=of nl1] (enc) {$E_{\theta}(\cdot)$};
+
+\node[cloudnode, right=of enc] (cloud) {CLOUD};
+
+\node[block, below=18mm of cloud] (dec) {$D_{\Phi}(\cdot)$};
+
+\node[block, left=of dec] (nl2) {Non-linear\\Transformation};
+
+\node[block, left=of nl2] (unstd) {De-standardization};
+
+\node[block, left=of unstd] (dec2) {Upsampling\\$\uparrow\,M/K$};
+
+% Final invisible output block: anchor east so text doesn't overlap incoming arrow
+\node[block, draw=none, fill=none, left=10mm of dec2, anchor=east] (out)
+  {\Large $\hat{S_x(\omega)}$};
+
+% Codebook (arrow entering decoder)
+\node[db, right=10mm of dec] (cb) {Codebook};
+\draw[line] (cb.west) -- (dec.east);
+
+% Main arrows with labels
+\draw[line] (bb) -- (dec1);
+
+\draw[line] (dec1) -- node[midway,above] {$S'_x(\omega)$} (std);
+
+\draw[line] (std) -- node[midway,above] {$s_x(\omega)$} (nl1);
+
+\draw[line] (nl1) -- node[midway,above] {$\sigma$} (enc);
+
+% Rename k -> b_s (bitstream carrying the VQ indices)
+\draw[line] (enc) -- node[midway,above] {$b_s$} (cloud);
+
+\draw[line] (cloud) -- node[midway,right] {$(b_s,b_t)$} (dec);
+
+\draw[line] (dec) -- node[midway,above] {$\hat{\sigma}$} (nl2);
+
+\draw[line] (nl2) -- node[midway,above] {$\hat{s}_x(\omega)$} (unstd);
+
+\draw[line] (unstd) -- node[midway,above] {$\hat{S}'_x(\omega)$} (dec2);
+
+\draw[line] (dec2) -- (out.east);
+
+% Side information: b_t enters the cloud
+\draw[line] (std.north) .. controls +(0,12mm) and +(0,12mm) ..
+  node[midway,above] {$b_t$} (cloud.north);
+
+\end{tikzpicture}
+}
+\end{center}
+
+\subsection{Sensing-driven quantities derived from the PSD}
+The remote monitor uses the reconstructed PSD to derive spectrum-sensing quantities relevant to FM monitoring. Typical examples include:
+\begin{align}
+\omega_{\mathrm{pk}} &\triangleq \arg\max_{\omega} S_t(\omega) && \text{(peak/candidate carrier)} \\
+\omega_{\mathrm{cent}} &\triangleq \frac{\sum_{n=1}^{N}\omega_n S_t(\omega_n)}{\sum_{n=1}^{N} S_t(\omega_n)} && \text{(spectral centroid)}.
+\end{align}
+Additionally, an occupancy map can be obtained by comparing the PSD to a (possibly frequency-dependent) noise-floor estimate $N_b(\omega)$ plus a margin $\gamma$:
+\begin{equation}
+O_t(\omega_n) \triangleq \mathbf{1}\{S_t(\omega_n) > N_b(\omega_n)+\gamma\}.
+\end{equation}
+Connected occupied regions define candidate emissions and may be used to estimate an occupied bandwidth $B_{\mathrm{occ}}$ (e.g., by thresholded support width or by a power-containment rule).
+
+\subsection{PSD compression pipeline (VQ-VAE system model)}
+For each PSD frame $\mathbf{S}_t$, the sensing node applies a deterministic pre-/post-processing chain and a learned VQ-VAE bottleneck.
+
+\paragraph{Decimation (frequency downsampling).}
+A deterministic operator reduces frequency resolution:
+\begin{equation}
+\mathbf{S}'_t = \mathcal{D}_{K/M}(\mathbf{S}_t)\in\mathbb{R}_+^{N'}, \qquad N' \approx N\cdot \frac{K}{M}.
+\end{equation}
+
+\paragraph{Standardization and side information.}
+We standardize the decimated PSD using parameters $\mathbf{t}_t$ (e.g., mean/scale, min/max, or blockwise gains),
+\begin{equation}
+\mathbf{s}_t = \mathrm{Std}(\mathbf{S}'_t;\mathbf{t}_t),
+\end{equation}
+and transmit a quantized representation of these parameters as side-information bits $b_t$ so the cloud can invert the operation.
+
+\paragraph{Non-linear transformation.}
+To better match the dynamic range of PSD values to the quantizer and the neural model, we apply an invertible pointwise mapping
+\begin{equation}
+\bm{\sigma}_t = g_{\mathrm{nl}}(\mathbf{s}_t), \qquad \mathbf{s}_t = g_{\mathrm{nl}}^{-1}(\bm{\sigma}_t).
+\end{equation}
+Examples include log-like compressions and other monotone mappings that reduce heavy tails.
+
+\paragraph{VQ-VAE encoder, vector quantization, and bitstream $b_s$.}
+The encoder produces latent features $\mathbf{z}_t = E_{\theta}(\bm{\sigma}_t)$ which are partitioned into blocks. Each block is quantized to the nearest codeword in a learned codebook $\mathcal{E}=\{\mathbf{e}_1,\ldots,\mathbf{e}_{|\mathcal{E}|}\}$:
+\begin{equation}
+\mathbf{k}_t = Q_{\mathcal{E}}(\mathbf{z}_t), \qquad \hat{\mathbf{z}}_t=\mathcal{E}[\mathbf{k}_t].
+\end{equation}
+The indices $\mathbf{k}_t$ are entropy-coded into a primary bitstream $b_s$ (main payload). The total transmitted/stored payload per PSD frame is therefore $(b_s,b_t)$.
+
+\paragraph{Decoder and inverse processing.}
+At the cloud, the decoder reconstructs
+\begin{align}
+\hat{\bm{\sigma}}_t &= D_{\Phi}(\hat{\mathbf{z}}_t),\\
+\hat{\mathbf{s}}_t &= g_{\mathrm{nl}}^{-1}(\hat{\bm{\sigma}}_t),\\
+\hat{\mathbf{S}}'_t &= \mathrm{DeStd}(\hat{\mathbf{s}}_t;\mathbf{t}_t),\\
+\hat{\mathbf{S}}_t &= \mathcal{U}_{M/K}(\hat{\mathbf{S}}'_t),
+\end{align}
+where $\mathcal{U}_{M/K}$ is an upsampling/interpolation operator restoring the original frequency grid.
+
+\subsection{Bit budget and rate--distortion objective}
+Let $L_{b_s}(t)$ and $L_{b_t}(t)$ denote the number of bits used by the main bitstream and the side information, respectively. The total payload per PSD frame is
+\begin{equation}
+L_b(t) = L_{b_s}(t) + L_{b_t}(t).
+\end{equation}
+We seek to compress the PSD while preserving both waveform-level fidelity and sensing-level decisions derived from the PSD.
+
+A rate--distortion formulation is:
+\begin{equation}
+\min_{\theta,\Phi,\mathcal{E}} \; \mathbb{E}\big[\mathcal{D}(\mathbf{S}_t,\hat{\mathbf{S}}_t)\big]
+\quad \text{s.t.}\quad
+\mathbb{E}[L_b(t)] \le R_{\max},
+\end{equation}
+or equivalently the Lagrangian form:
+\begin{equation}
+\min_{\theta,\Phi,\mathcal{E}} \; \mathbb{E}\Big[\lambda\,\mathcal{D}(\mathbf{S}_t,\hat{\mathbf{S}}_t) + L_b(t)\Big],
+\end{equation}
+where $\lambda>0$ controls the rate--distortion trade-off.
+
+\subsection{Distortion tailored to spectrum sensing}
+Because the cloud ultimately performs sensing on $\hat{\mathbf{S}}_t$, we define $\mathcal{D}$ to penalize errors that matter for monitoring:
+\begin{enumerate}
+\item \textbf{PSD fidelity.} A normalized reconstruction error (often in log-PSD) such as
+\begin{equation}
+\mathcal{D}_{\mathrm{psd}} = \frac{1}{N}\sum_{n=1}^{N} \big(\psi(S_t(\omega_n))-\psi(\hat{S}_t(\omega_n))\big)^2,
+\end{equation}
+with $\psi(\cdot)$ an optional dynamic-range map (e.g., $\log(\epsilon+\cdot)$).
+
+\item \textbf{Occupancy consistency.} Let $O_t(\omega_n)$ and $\hat{O}_t(\omega_n)$ be computed from $S_t$ and $\hat{S}_t$ using the same noise-floor rule. Penalize mismatches, e.g., by a weighted binary cross-entropy (or FP/FN-weighted) loss across frequency bins.
+
+\item \textbf{Feature preservation.} Penalize deviations in sensing features such as peak and centroid:
+\begin{equation}
+\mathcal{D}_{\mathrm{feat}} =
+\alpha_{\mathrm{pk}}|\omega_{\mathrm{pk}}-\hat{\omega}_{\mathrm{pk}}|
++\alpha_{\mathrm{cent}}|\omega_{\mathrm{cent}}-\hat{\omega}_{\mathrm{cent}}|
++\alpha_{B}|B_{\mathrm{occ}}-\hat{B}_{\mathrm{occ}}|.
+\end{equation}
+\end{enumerate}
+A practical overall distortion is a weighted sum,
+\begin{equation}
+\mathcal{D} = \beta_{\mathrm{psd}}\mathcal{D}_{\mathrm{psd}} + \beta_{\mathrm{occ}}\mathcal{D}_{\mathrm{occ}} + \beta_{\mathrm{feat}}\mathcal{D}_{\mathrm{feat}}.
+\end{equation}
+
+\subsection{VQ-VAE training losses (codebook and commitment)}
+In addition to the rate--distortion objective above, VQ-VAE training typically includes terms that stabilize the discrete bottleneck. Let $\mathrm{sg}[\cdot]$ denote the stop-gradient operator. A common choice is:
+\begin{equation}
+\mathcal{L}_{\mathrm{VQ}} =
+\big\|\mathrm{sg}[\mathbf{z}_t]-\hat{\mathbf{z}}_t\big\|_2^2
++ \beta_{\mathrm{com}}\big\|\mathbf{z}_t-\mathrm{sg}[\hat{\mathbf{z}}_t]\big\|_2^2,
+\end{equation}
+where the first term updates the codebook and the second (commitment) term encourages encoder outputs to stay close to selected codewords.
+
+\vspace{2mm}
+\noindent\textbf{Overall training problem.}
+Combining the sensing-aware distortion, the bit budget, and the VQ terms yields the final learning problem:
+\begin{equation}
+\min_{\theta,\Phi,\mathcal{E}} \;
+\mathbb{E}\Big[\lambda\,\mathcal{D}(\mathbf{S}_t,\hat{\mathbf{S}}_t) + L_b(t)\Big]
++ \eta\,\mathbb{E}\big[\mathcal{L}_{\mathrm{VQ}}\big],
+\end{equation}
+with hyperparameters $\lambda,\eta,\beta_{\mathrm{com}}$ and the sensing-aware weights inside $\mathcal{D}$.
+
+\end{document}

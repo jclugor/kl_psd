@@ -21,13 +21,13 @@
   },
   "losses": {
     "beta_used_for_reporting": 1.0,
-    "recon_loss": 0.19249995052814484,
-    "kl_loss": 0.014009433798491955,
-    "total_loss": 0.2065093843266368
+    "recon_loss": 0.1434139758348465,
+    "kl_loss": 0.0031817967537790537,
+    "total_loss": 0.14659577258862555
   },
   "peak_metrics": {
     "topk": 32,
-    "topk_peak_mse": 0.0008925516158342361,
-    "peak_bias_mean_recon_minus_orig": -0.002885734662413597
+    "topk_peak_mse": 0.0006106378859840333,
+    "peak_bias_mean_recon_minus_orig": 0.0017766939708963037
   }
 }

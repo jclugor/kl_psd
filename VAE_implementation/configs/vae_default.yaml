@@ -18,9 +18,9 @@ preprocess:
 
 train:
   batch_size: 256
-  epochs: 100
+  epochs: 1000
   steps_multiplier: 4          # steps_per_epoch = ceil(N/B)*multiplier (para dataset pequeño)
-  lr: 3.0e-4
+  lr: 1.0e-4
   clipnorm: 1.0
   beta_final: 1.0
   beta_warmup_epochs: 80

@@ -1,0 +1,15 @@
+{
+  "tag": "GLOBAL_BEST",
+  "processed_dir": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\data\\processed\\psd_1024",
+  "encoder_weights": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\VAE_implementation\\models\\GLOBAL_BEST\\enc_best.weights.h5",
+  "export_dir": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\VAE_implementation\\models\\GLOBAL_BEST",
+  "keras_encoder_mu": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\VAE_implementation\\models\\GLOBAL_BEST\\encoder_mu.keras",
+  "tflite_encoder_mu_int8": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\VAE_implementation\\models\\GLOBAL_BEST\\encoder_mu_int8.tflite",
+  "ptq": {
+    "n_rep": 512,
+    "n_val": 64,
+    "mu_mae": 0.0014709432143718004,
+    "mu_rmse": 0.0018463844899088144,
+    "mu_max_abs": 0.00677137915045023
+  }
+}

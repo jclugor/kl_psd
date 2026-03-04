@@ -1,0 +1,18 @@
+{
+  "tag": "GLOBAL_BEST",
+  "split": "train",
+  "n_frames": 774,
+  "tflite": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\VAE_implementation\\models\\GLOBAL_BEST\\encoder_mu_int8.tflite",
+  "entropy": {
+    "H_mu_bits_per_symbol": 6.938547300618468,
+    "H_delta_bits_per_symbol": 6.492315204477232,
+    "bytes_per_frame_mu_lower_bound": 27.75418920247387,
+    "bytes_per_frame_delta_lower_bound": 25.96926081790893,
+    "keyframe_every": 30,
+    "delta_samples": 746
+  },
+  "notes": [
+    "Entropy is a lower bound (ideal coder). Real Huffman/ANS will be close but not identical.",
+    "Delta uses int8 clipping; if you store int16 deltas, re-run without clipping and compute a different histogram."
+  ]
+}

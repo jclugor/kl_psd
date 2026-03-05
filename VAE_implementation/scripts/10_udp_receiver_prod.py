@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+"""
+10_udp_receiver_prod.py — Production UDP receiver (server side).
+
+Receives production packets (no indices):
+- packet -> decode_packet_to_mu() -> mu_int8 block (L,32)
+- dequant mu using encoder_mu_int8.tflite output quant params
+- reconstruct x_norm using decoder weights
+- optionally invert normalization back to original scale (global_minmax via gmin/gmax in npz)
+- save plots (waterfall + last PSD line)
+
+Robust:
+- no crash on timeouts
+- idle_stop optional
+- seq gap / out-of-order logging
+
+Usage:
+  python VAE_implementation/scripts/10_udp_receiver_prod.py --config ... --use_global_best --bind_ip 0.0.0.0 --port 5005 --idle_stop_s 10
+
+Outputs:
+  <model_dir>/udp_prod/
+"""
+
+import argparse
+import importlib.util
+import socket
+import time
+from pathlib import Path
+import json
+
+import numpy as np
+import yaml
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+
+# Try lightweight TFLite runtime (optional). Receiver can use TF too.
+try:
+    from tflite_runtime.interpreter import Interpreter as TFLiteInterpreter
+except Exception:
+    from tensorflow.lite import Interpreter as TFLiteInterpreter  # type: ignore
+
+
+def repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def ensure_dir(p: Path) -> None:
+    p.mkdir(parents=True, exist_ok=True)
+
+
+def load_pack_module() -> object:
+    root = repo_root()
+    mod_path = root / "VAE_implementation" / "scripts" / "07_pack_unpack.py"
+    spec = importlib.util.spec_from_file_location("packmod", str(mod_path))
+    mod = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _has_conv1d_transpose() -> bool:
+    return hasattr(layers, "Conv1DTranspose")
+
+
+def build_decoder(latent_dim: int = 32) -> keras.Model:
+    z_in = keras.Input(shape=(latent_dim,), name="z_in")
+    x = layers.Dense(256 * 32, name="dec_dense")(z_in)
+    x = layers.Reshape((256, 32), name="dec_reshape")(x)
+
+    if _has_conv1d_transpose():
+        Conv1DTranspose = layers.Conv1DTranspose
+        x = Conv1DTranspose(32, kernel_size=3, strides=2, padding="same", name="dec_deconv1")(x)
+        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu1")(x)
+        x = Conv1DTranspose(16, kernel_size=5, strides=2, padding="same", name="dec_deconv2")(x)
+        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu2")(x)
+    else:
+        x = layers.UpSampling1D(size=2, name="dec_ups1")(x)
+        x = layers.Conv1D(32, kernel_size=3, padding="same", name="dec_conv1")(x)
+        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu1")(x)
+        x = layers.UpSampling1D(size=2, name="dec_ups2")(x)
+        x = layers.Conv1D(16, kernel_size=5, padding="same", name="dec_conv2")(x)
+        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu2")(x)
+
+    x_hat = layers.Conv1D(1, kernel_size=1, activation="sigmoid", name="x_hat")(x)
+    return keras.Model(z_in, x_hat, name="decoder")
+
+
+def load_npz(processed_dir: Path) -> dict:
+    npz_path = processed_dir / "dataset_psd_1024_norm.npz"
+    if not npz_path.exists():
+        candidates = sorted(processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True)
+        if not candidates:
+            raise FileNotFoundError(f"No .npz found in {processed_dir}")
+        npz_path = candidates[0]
+    d = np.load(npz_path, allow_pickle=True)
+    return {k: d[k] for k in d.files}
+
+
+def invert_global_minmax(x_norm: np.ndarray, gmin: float, gmax: float) -> np.ndarray:
+    return x_norm * (gmax - gmin) + gmin
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", required=True)
+    ap.add_argument("--use_global_best", action="store_true")
+    ap.add_argument("--run_name", default=None)
+
+    ap.add_argument("--bind_ip", default="0.0.0.0")
+    ap.add_argument("--port", type=int, default=5005)
+
+    ap.add_argument("--socket_timeout_s", type=float, default=1.0)
+    ap.add_argument("--idle_stop_s", type=float, default=0.0, help="Stop if no packets for X seconds (0=never).")
+    ap.add_argument("--max_packets", type=int, default=0, help="0=run until idle_stop or Ctrl+C")
+
+    ap.add_argument("--waterfall_max_frames", type=int, default=300)
+    ap.add_argument("--save_every_packets", type=int, default=10, help="Save plots every N packets.")
+    ap.add_argument("--invert_norm_to_original", action="store_true", help="Use gmin/gmax from npz to return to original scale.")
+    args = ap.parse_args()
+
+    root = repo_root()
+    cfg_path = Path(args.config)
+    if not cfg_path.is_absolute():
+        cfg_path = root / cfg_path
+    cfg = yaml.safe_load(cfg_path.read_text())
+
+    processed_dir = root / cfg["paths"]["processed_dir"]
+    models_dir = root / cfg["paths"]["models_dir"]
+
+    if args.use_global_best:
+        model_dir = models_dir / "GLOBAL_BEST"
+        tag = "GLOBAL_BEST"
+    else:
+        run = args.run_name or cfg.get("train", {}).get("run_name", "run_current")
+        model_dir = models_dir / "runs" / run
+        tag = f"RUN:{run}"
+
+    out_dir = model_dir / "udp_prod"
+    ensure_dir(out_dir)
+
+    packmod = load_pack_module()
+
+    # Load decoder
+    dec_w = model_dir / "dec_best.weights.h5"
+    if not dec_w.exists():
+        raise FileNotFoundError(f"Decoder weights not found: {dec_w}")
+    decoder = build_decoder(latent_dim=32)
+    _ = decoder(tf.zeros((1, 32), dtype=tf.float32), training=False)
+    decoder.load_weights(dec_w)
+
+    # Load encoder tflite only for output quant params
+    tflite_path = model_dir / "encoder_mu_int8.tflite"
+    if not tflite_path.exists():
+        raise FileNotFoundError(f"TFLite encoder not found: {tflite_path}")
+    tfl = TFLiteInterpreter(model_path=str(tflite_path))
+    tfl.allocate_tensors()
+    out_det = tfl.get_output_details()[0]
+    out_scale, out_zp = out_det["quantization"]
+    print("[RECV10] Dequant:", "scale=", out_scale, "zp=", out_zp)
+
+    # Optional inverse normalization params
+    npz = load_npz(processed_dir)
+    norm_mode = str(npz.get("normalize_mode", "global_minmax"))
+    gmin = float(npz.get("gmin", np.nan))
+    gmax = float(npz.get("gmax", np.nan))
+    if args.invert_norm_to_original:
+        if norm_mode != "global_minmax" or not np.isfinite(gmin + gmax):
+            print("[RECV10] WARN invert_norm_to_original requested but npz lacks valid global_minmax params. Will save normalized scale.")
+            args.invert_norm_to_original = False
+        else:
+            print("[RECV10] Inverting normalization to original scale using gmin/gmax.")
+
+    # UDP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((args.bind_ip, args.port))
+    sock.settimeout(float(args.socket_timeout_s))
+
+    print(f"[RECV10] Listening udp://{args.bind_ip}:{args.port} | {tag}")
+
+    packets = 0
+    frames = 0
+    bytes_total = 0
+
+    last_seq = None
+    seq_gaps = 0
+    out_of_order = 0
+
+    wf = []  # store recent reconstructed PSD frames (in chosen scale)
+    last_psd = None
+
+    t0 = time.perf_counter()
+    last_recv = time.perf_counter()
+
+    try:
+        while True:
+            if args.max_packets > 0 and packets >= args.max_packets:
+                break
+            if args.idle_stop_s > 0 and (time.perf_counter() - last_recv) > args.idle_stop_s and packets > 0:
+                print("[RECV10] Idle stop.")
+                break
+
+            try:
+                data, addr = sock.recvfrom(65535)
+            except socket.timeout:
+                continue
+
+            last_recv = time.perf_counter()
+            packets += 1
+            bytes_total += len(data)
+
+            hdr, mu_block = packmod.decode_packet_to_mu(data)  # (L,32) int8
+            L = int(mu_block.shape[0])
+            frames += L
+
+            # Seq checks
+            if last_seq is not None:
+                if hdr.seq < last_seq:
+                    out_of_order += 1
+                elif hdr.seq > last_seq + 1:
+                    seq_gaps += int(hdr.seq - last_seq - 1)
+            last_seq = hdr.seq
+
+            # Dequant mu
+            mu_f = (mu_block.astype(np.float32) - float(out_zp)) * float(out_scale)  # (L,32)
+
+            # Decode to normalized PSD
+            x_norm = decoder(mu_f, training=False).numpy()[:, :, 0]  # (L,1024)
+
+            # Convert to original scale if requested
+            if args.invert_norm_to_original:
+                x_out = invert_global_minmax(x_norm, gmin=gmin, gmax=gmax)
+            else:
+                x_out = x_norm
+
+            last_psd = x_out[-1].copy()
+
+            # Waterfall ring buffer
+            wf.append(x_out)
+            # trim by frame count
+            while sum(a.shape[0] for a in wf) > args.waterfall_max_frames:
+                wf.pop(0)
+
+            # Save plots periodically
+            if args.save_every_packets > 0 and (packets % args.save_every_packets == 0):
+                W = np.vstack(wf)
+
+                plt.figure(figsize=(10, 5))
+                plt.imshow(W, aspect="auto", origin="lower", interpolation="nearest")
+                plt.title("Waterfall RECON (recent frames)")
+                plt.xlabel("bin")
+                plt.ylabel("frame")
+                plt.colorbar()
+                plt.tight_layout()
+                plt.savefig(out_dir / "waterfall_recon.png", dpi=180)
+                plt.close()
+
+                plt.figure(figsize=(10, 3))
+                plt.plot(last_psd)
+                plt.title("Last reconstructed PSD (production)")
+                plt.xlabel("bin")
+                plt.ylabel("value" if not args.invert_norm_to_original else "original scale")
+                plt.grid(True)
+                plt.tight_layout()
+                plt.savefig(out_dir / "psd_last.png", dpi=180)
+                plt.close()
+
+                np.save(out_dir / "recon_last_psd.npy", last_psd)
+
+                metrics = {
+                    "tag": tag,
+                    "packets": int(packets),
+                    "frames": int(frames),
+                    "bytes_total": int(bytes_total),
+                    "avg_bytes_per_frame": float(bytes_total / max(1, frames)),
+                    "frames_per_second": float(frames / max(1e-9, (time.perf_counter() - t0))),
+                    "seq_gaps": int(seq_gaps),
+                    "out_of_order": int(out_of_order),
+                    "dequant": {"out_scale": float(out_scale), "out_zero_point": int(out_zp)},
+                    "scale": "original" if args.invert_norm_to_original else "normalized",
+                }
+                (out_dir / "udp_prod_metrics.json").write_text(json.dumps(metrics, indent=2))
+                print("[RECV10] Saved plots/metrics:", out_dir)
+
+    except KeyboardInterrupt:
+        print("[RECV10] Ctrl+C, stopping...")
+
+    dt = time.perf_counter() - t0
+    print(f"[RECV10] DONE packets={packets} frames={frames} bytes={bytes_total} "
+          f"| frames/s={frames/max(1e-9,dt):.1f} | avg bytes/frame={bytes_total/max(1,frames):.3f}")
+    print("[RECV10] seq_gaps:", seq_gaps, "| out_of_order:", out_of_order)
+    print("[RECV10] outputs:", out_dir)
+
+
+if __name__ == "__main__":
+    main()

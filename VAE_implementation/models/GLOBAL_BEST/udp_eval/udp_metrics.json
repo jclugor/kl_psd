@@ -1,0 +1,48 @@
+{
+  "tag": "GLOBAL_BEST",
+  "packets": 3,
+  "frames": 90,
+  "bytes_total": 3142,
+  "avg_bytes_per_frame": 34.91111111111111,
+  "frames_per_second": 1.8802018369099782,
+  "seconds": 47.867201399989426,
+  "seq_gaps": 0,
+  "out_of_order": 0,
+  "metrics_avg_per_packet": {
+    "mse_sum": 0.15996054311593375,
+    "topk_mse": 0.0006985422999908527,
+    "peak_bias": 0.0029142029816284776,
+    "topk": 32
+  },
+  "dequant": {
+    "out_scale": 0.0004932410665787756,
+    "out_zero_point": -8
+  },
+  "plots_dir": "C:\\Users\\gilse\\OneDrive\\Escritorio\\VAE\\kl_psd\\VAE_implementation\\models\\GLOBAL_BEST\\udp_eval",
+  "blocks": [
+    {
+      "seq": 0,
+      "L": 30,
+      "bytes": 1047,
+      "mse_sum": 0.15373769402503967,
+      "topk_mse": 0.0007401308394037187,
+      "peak_bias": -0.0012757241493090987
+    },
+    {
+      "seq": 1,
+      "L": 30,
+      "bytes": 1042,
+      "mse_sum": 0.1574530005455017,
+      "topk_mse": 0.0006463218596763909,
+      "peak_bias": 0.01238886546343565
+    },
+    {
+      "seq": 2,
+      "L": 30,
+      "bytes": 1053,
+      "mse_sum": 0.16869093477725983,
+      "topk_mse": 0.0007091742008924484,
+      "peak_bias": -0.0023705323692411184
+    }
+  ]
+}

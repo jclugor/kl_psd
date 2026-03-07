@@ -1,0 +1,17 @@
+{
+  "tag": "GLOBAL_BEST",
+  "packets": 3,
+  "frames": 90,
+  "bytes_total": 2872,
+  "avg_bytes_per_frame": 31.91111111111111,
+  "frames_per_second": 4.076481071745355,
+  "seq_gaps": 0,
+  "out_of_order": 0,
+  "dequant": {
+    "out_scale": 0.0004932410665787756,
+    "out_zero_point": -8
+  },
+  "scale": "original",
+  "compare_split": "test",
+  "compare_frames_used": 90
+}

@@ -1,9 +1,10 @@
 # VAE_implementation
 
-Guia rapida para ejecutar el pipeline de compresion PSD con VAE.
+Guia rapida para ejecutar el pipeline de compresion PSD con VAE (version estable sin Kalman).
 
-Documentacion completa (teoria, arquitectura, detalle script por script):
+Documentacion completa:
 - `VAE_implementation/DOCUMENTACION_TECNICA.md`
+- `VAE_implementation/IMPLEMENTACION_REAL.md`
 
 ## Flujo rapido
 
@@ -15,10 +16,10 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-En Raspberry/edge puedes usar runtime liviano opcional:
+Para edge con fuente SDR por ZMQ:
 
 ```powershell
-pip install tflite-runtime
+pip install pyzmq
 ```
 
 1. Descargar dataset:
@@ -51,63 +52,62 @@ python VAE_implementation/scripts/03_eval.py --config VAE_implementation/configs
 python VAE_implementation/scripts/04_export_tflite.py --config VAE_implementation/configs/vae_default.yaml --use_global_best
 ```
 
-6. Entropia y benchmark:
+## Produccion (local test)
+
+Receiver:
 
 ```powershell
-python VAE_implementation/scripts/05_entropy_stats.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --split train --keyframe_every 30
-python VAE_implementation/scripts/06_codec_benchmark.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --split train --keyframe_every 30
+python VAE_implementation/scripts/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --save_every_packets 1 --idle_stop_s 3 --invert_norm_to_original
 ```
 
-7. Probar formato de paquete (wire format, opcional):
-
-```powershell
-python VAE_implementation/scripts/07_pack_unpack.py --self_test --n_frames 120 --block_len 30 --zlib_level 1
-```
-
-8. UDP basico (etapa 8, opcional):
-
-Receiver (Terminal A):
-
-```powershell
-python VAE_implementation/scripts/08_udp_receiver.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --reconstruct
-```
-
-Sender (Terminal B):
-
-```powershell
-python VAE_implementation/scripts/08_udp_sender.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --dest_ip 127.0.0.1 --port 5005 --split test --block_len 30 --n_blocks 3 --zlib_level 1
-```
-
-## UDP (test local)
-
-Receiver (Terminal A):
-
-```powershell
-python VAE_implementation/scripts/09_udp_receiver_plot_compare.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --idle_stop_s 5
-```
-
-Sender (Terminal B):
-
-```powershell
-python VAE_implementation/scripts/09_udp_sender_indexed.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --dest_ip 127.0.0.1 --port 5005 --split test --block_len 30 --n_blocks 3 --zlib_level 1
-```
-
-## UDP (produccion, etapa 10)
-
-Receiver prod (servidor, Terminal A):
-
-```powershell
-python VAE_implementation/scripts/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 0.0.0.0 --port 5005 --idle_stop_s 10 --save_every_packets 10
-```
-
-Sender prod (edge/simulador, Terminal B):
+Sender (simulado con dataset):
 
 ```powershell
 python VAE_implementation/scripts/10_udp_sender_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --dest_ip 127.0.0.1 --port 5005 --source dataset --split test --block_len 30 --n_blocks 3 --zlib_level 1
 ```
 
+Comparacion (guardar original + reconstruccion):
+
+```powershell
+python VAE_implementation/scripts/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --save_every_packets 1 --idle_stop_s 3 --invert_norm_to_original --compare_split test --plot_every_packets 1
+```
+
+## Produccion (SDR real)
+
+Servidor (receiver):
+
+```powershell
+python VAE_implementation/scripts/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 0.0.0.0 --port 5005 --save_every_packets 10 --idle_stop_s 10 --invert_norm_to_original
+```
+
+Edge (bridge ZMQ PSD -> UDP):
+
+```bash
+python VAE_implementation/scripts/11_edge_hackrf_psd_zmq_to_udp.py \
+  --config VAE_implementation/configs/vae_default.yaml \
+  --use_global_best \
+  --ipc "ipc:///tmp/ane_psd.ipc" \
+  --dest_ip <IP_SERVIDOR> --port 5005 \
+  --block_len 30 --zlib_level 1
+```
+
+Si la PSD viene en otra llave JSON:
+
+```bash
+--psd_key <nombre_llave>
+```
+
+## Si ya tienes modulo PSD, que falta
+
+- Validar que el emisor PSD conecte a `ipc:///tmp/ane_psd.ipc` (PAIR).
+- Confirmar escala de entrada (original dB/dBm o `--already_normalized`).
+- Verificar red UDP y firewall.
+- Definir ejecucion continua (servicio + logs).
+
 ## Notas
 
-- `10_udp_sender_prod.py` esta listo para envio productivo.
-- `10_udp_receiver_prod.py` ya esta implementado y guarda salidas en `udp_prod/`.
+- Ruta principal actual: `10_udp_sender_prod.py` + `10_udp_receiver_prod.py`.
+- Integracion SDR en vivo: `11_edge_hackrf_psd_zmq_to_udp.py`.
+- Etapas `08` y `09` se mantienen para pruebas/diagnostico.
 - Config principal: `VAE_implementation/configs/vae_default.yaml`.
+

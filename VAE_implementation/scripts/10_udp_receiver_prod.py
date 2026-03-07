@@ -42,8 +42,10 @@ from tensorflow.keras import layers
 # Try lightweight TFLite runtime (optional). Receiver can use TF too.
 try:
     from tflite_runtime.interpreter import Interpreter as TFLiteInterpreter
-except Exception:
-    from tensorflow.lite import Interpreter as TFLiteInterpreter  # type: ignore
+except ModuleNotFoundError:
+    import tensorflow as tf
+
+    TFLiteInterpreter = tf.lite.Interpreter
 
 
 def repo_root() -> Path:
@@ -102,6 +104,14 @@ def load_npz(processed_dir: Path) -> dict:
     return {k: d[k] for k in d.files}
 
 
+def load_splits(processed_dir: Path):
+    sdir = processed_dir / "splits"
+    tr = np.load(sdir / "train_idx.npy")
+    va = np.load(sdir / "val_idx.npy")
+    te = np.load(sdir / "test_idx.npy")
+    return tr, va, te
+
+
 def invert_global_minmax(x_norm: np.ndarray, gmin: float, gmax: float) -> np.ndarray:
     return x_norm * (gmax - gmin) + gmin
 
@@ -122,6 +132,10 @@ def main():
     ap.add_argument("--waterfall_max_frames", type=int, default=300)
     ap.add_argument("--save_every_packets", type=int, default=10, help="Save plots every N packets.")
     ap.add_argument("--invert_norm_to_original", action="store_true", help="Use gmin/gmax from npz to return to original scale.")
+    ap.add_argument("--compare_split", choices=["train", "val", "test"], default=None,
+                    help="Optional local-test mode: compare against original frames from this split.")
+    ap.add_argument("--plot_every_packets", type=int, default=1,
+                    help="Save overlay every N packets in compare mode.")
     args = ap.parse_args()
 
     root = repo_root()
@@ -176,6 +190,17 @@ def main():
         else:
             print("[RECV10] Inverting normalization to original scale using gmin/gmax.")
 
+    compare_enabled = args.compare_split is not None
+    X_ref = None
+    ref_cursor = 0
+    if compare_enabled:
+        tr, va, te = load_splits(processed_dir)
+        split_idx = {"train": tr, "val": va, "test": te}[args.compare_split].astype(np.int64)
+        X_ref = npz["X"].astype(np.float32)[split_idx]
+        if args.invert_norm_to_original:
+            X_ref = invert_global_minmax(X_ref, gmin, gmax)
+        print(f"[RECV10] Compare mode enabled with split={args.compare_split}, frames={X_ref.shape[0]}")
+
     # UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((args.bind_ip, args.port))
@@ -192,7 +217,9 @@ def main():
     out_of_order = 0
 
     wf = []  # store recent reconstructed PSD frames (in chosen scale)
+    wf_orig = []  # optional compare-mode originals
     last_psd = None
+    last_orig = None
 
     t0 = time.perf_counter()
     last_recv = time.perf_counter()
@@ -242,9 +269,30 @@ def main():
 
             # Waterfall ring buffer
             wf.append(x_out)
+            if compare_enabled and X_ref is not None and ref_cursor < X_ref.shape[0]:
+                n_take = min(L, X_ref.shape[0] - ref_cursor)
+                x_orig = X_ref[ref_cursor:ref_cursor + n_take]
+                ref_cursor += n_take
+                last_orig = x_orig[-1].copy()
+                wf_orig.append(x_orig)
+
+                if args.plot_every_packets > 0 and (packets % args.plot_every_packets == 0):
+                    plt.figure(figsize=(10, 3))
+                    plt.plot(x_orig[0], label="orig")
+                    plt.plot(x_out[0], label="recon")
+                    plt.title(f"Overlay packet {packets} (frame 0)")
+                    plt.xlabel("bin")
+                    plt.ylabel("value" if not args.invert_norm_to_original else "original scale")
+                    plt.grid(True)
+                    plt.legend()
+                    plt.tight_layout()
+                    plt.savefig(out_dir / f"overlay_pkt{packets:06d}.png", dpi=180)
+                    plt.close()
             # trim by frame count
             while sum(a.shape[0] for a in wf) > args.waterfall_max_frames:
                 wf.pop(0)
+            while compare_enabled and sum(a.shape[0] for a in wf_orig) > args.waterfall_max_frames:
+                wf_orig.pop(0)
 
             # Save plots periodically
             if args.save_every_packets > 0 and (packets % args.save_every_packets == 0):
@@ -260,6 +308,18 @@ def main():
                 plt.savefig(out_dir / "waterfall_recon.png", dpi=180)
                 plt.close()
 
+                if compare_enabled and wf_orig:
+                    W0 = np.vstack(wf_orig)
+                    plt.figure(figsize=(10, 5))
+                    plt.imshow(W0, aspect="auto", origin="lower", interpolation="nearest")
+                    plt.title("Waterfall ORIG (recent frames)")
+                    plt.xlabel("bin")
+                    plt.ylabel("frame")
+                    plt.colorbar()
+                    plt.tight_layout()
+                    plt.savefig(out_dir / "waterfall_orig.png", dpi=180)
+                    plt.close()
+
                 plt.figure(figsize=(10, 3))
                 plt.plot(last_psd)
                 plt.title("Last reconstructed PSD (production)")
@@ -271,6 +331,8 @@ def main():
                 plt.close()
 
                 np.save(out_dir / "recon_last_psd.npy", last_psd)
+                if compare_enabled and last_orig is not None:
+                    np.save(out_dir / "orig_last_psd.npy", last_orig)
 
                 metrics = {
                     "tag": tag,
@@ -284,6 +346,9 @@ def main():
                     "dequant": {"out_scale": float(out_scale), "out_zero_point": int(out_zp)},
                     "scale": "original" if args.invert_norm_to_original else "normalized",
                 }
+                if compare_enabled and X_ref is not None:
+                    metrics["compare_split"] = args.compare_split
+                    metrics["compare_frames_used"] = int(min(ref_cursor, X_ref.shape[0]))
                 (out_dir / "udp_prod_metrics.json").write_text(json.dumps(metrics, indent=2))
                 print("[RECV10] Saved plots/metrics:", out_dir)
 

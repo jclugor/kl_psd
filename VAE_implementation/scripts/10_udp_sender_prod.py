@@ -37,8 +37,10 @@ import zlib
 # Try lightweight TFLite runtime first (Raspberry-friendly)
 try:
     from tflite_runtime.interpreter import Interpreter as TFLiteInterpreter
-except Exception:
-    from tensorflow.lite import Interpreter as TFLiteInterpreter  # type: ignore
+except ModuleNotFoundError:
+    import tensorflow as tf
+
+    TFLiteInterpreter = tf.lite.Interpreter
 
 
 def repo_root() -> Path:

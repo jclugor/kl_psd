@@ -1,0 +1,21 @@
+dataset:
+  path: data/processed/psd_1024/dataset_psd_1024_norm.npz
+
+codec:
+  decimation_factor_bins: 2
+  top_k_coeffs: 128
+  quant_step: 0.02
+  nonlinear_mode: signed_log1p
+  nonlinear_alpha: 1.5
+  side_info_bits_per_param: 16
+  value_bits_per_coeff: 16
+
+evaluation:
+  max_frames: 64
+  occupancy_margin_db: 3.0
+
+outputs:
+  packet_path: data/processed/psd_1024/fwht_packet_frame0.npz
+  decode_path: data/processed/psd_1024/fwht_reconstruction_frame0.npy
+  report_path: data/processed/psd_1024/fwht_eval_report.json
+

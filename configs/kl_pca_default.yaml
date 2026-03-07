@@ -1,0 +1,22 @@
+dataset:
+  path: data/processed/psd_1024/dataset_psd_1024_norm.npz
+
+fit:
+  n_components: 32
+  max_frames: 512
+  center: true
+
+codec:
+  bits_per_coeff: 16
+  enforce_nonnegative: true
+
+evaluation:
+  max_frames: 64
+  occupancy_margin_db: 3.0
+
+outputs:
+  model_path: data/processed/psd_1024/kl_pca_model.npz
+  coeff_path: data/processed/psd_1024/kl_pca_coeff_frame0.npy
+  decode_path: data/processed/psd_1024/kl_pca_reconstruction_frame0.npy
+  report_path: data/processed/psd_1024/kl_pca_eval_report.json
+

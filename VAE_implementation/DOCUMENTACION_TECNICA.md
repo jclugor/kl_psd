@@ -86,7 +86,7 @@ python VAE_implementation/scripts/11_edge_hackrf_psd_zmq_to_udp.py \
 
 ## 6. Datos y normalizacion
 
-- El bridge `12` espera PSD en escala original (dB/dBm-like).
+- El bridge `11` espera PSD en escala original (dB/dBm-like).
 - Normaliza usando `gmin/gmax` del dataset procesado.
 - Si ya llega normalizado, usar `--already_normalized`.
 

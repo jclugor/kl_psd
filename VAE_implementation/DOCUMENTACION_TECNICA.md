@@ -1,81 +1,58 @@
-# VAE_implementation
+﻿# VAE_implementation
 
-Documentacion tecnica de la version estable sin Kalman.
+Documentacion tecnica de la implementacion VAE PSD (version estable).
 
 ## 1. Objetivo
 
-Comprimir PSD de 1024 bins con VAE para transporte eficiente por UDP.
+Comprimir y transportar PSD (1024 bins) por UDP minimizando ancho de banda y manteniendo reconstruccion usable.
 
 ## 2. Arquitectura
 
-- Encoder TFLite INT8 en edge
-- Decoder Keras en servidor
-- Transporte UDP con formato `KLP1`
+- Encoder TFLite INT8 en edge.
+- Decoder Keras en servidor.
+- Protocolo UDP binario (`KLP1`) definido en `07_pack_unpack.py`.
+- Flujo temporal: cada bloque transmite `mu_int8` (mu0+deltas).
 
 ## 3. Scripts clave
 
-- `00_get_data.ps1`: descarga dataset
-- `01_preprocess.py`: genera dataset normalizado + splits
-- `02_train.py`: entrenamiento VAE
-- `03_eval.py`: evaluacion y plots
-- `04_export_tflite.py`: export encoder INT8
-- `05_entropy_stats.py`: analisis entropia latente
-- `06_codec_benchmark.py`: benchmark de codec
-- `07_pack_unpack.py`: wire format y pack/unpack
-- `08_udp_*`: pruebas basicas
-- `09_udp_*`: pruebas con comparacion contra original
-- `10_udp_sender_prod.py`: sender produccion
-- `10_udp_receiver_prod.py`: receiver produccion
-- `11_edge_hackrf_psd_zmq_to_udp.py`: bridge SDR (ZMQ PSD -> UDP)
+Base:
+- `01_preprocess.py`, `02_train.py`, `03_eval.py`, `04_export_tflite.py`
+- `07_pack_unpack.py`
 
-## 4. Pipeline
+Produccion:
+- `10_udp_sender_prod.py`
+- `10_udp_receiver_prod.py`
+- `11_edge_hackrf_psd_zmq_to_udp.py`
+- `12_acq_sensor_to_zmq.py` (adaptador de adquisicion externa)
 
+## 4. Dependencias
+
+- `numpy`, `tensorflow/keras`, `pyyaml`, `matplotlib`
+- `pyzmq` (bridge SDR)
+- `tflite-runtime` opcional en edge
+
+## 5. Flujo de ejecucion
+
+1. Exportar TFLite:
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-```powershell
-.\VAE_implementation\scripts\00_get_data.ps1
-python VAE_implementation/scripts/01_preprocess.py --config VAE_implementation/configs/vae_default.yaml
-python VAE_implementation/scripts/02_train.py --config VAE_implementation/configs/vae_default.yaml
 python VAE_implementation/scripts/04_export_tflite.py --config VAE_implementation/configs/vae_default.yaml --use_global_best
 ```
 
-## 5. Produccion
-
-## 5.1 Simulacion local
-
-Receiver:
-
-```powershell
-python VAE_implementation/scripts/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --save_every_packets 1 --idle_stop_s 3 --invert_norm_to_original
-```
-
-Sender:
-
-```powershell
-python VAE_implementation/scripts/10_udp_sender_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --dest_ip 127.0.0.1 --port 5005 --source dataset --split test --block_len 30 --n_blocks 3 --zlib_level 1
-```
-
-Comparacion (original vs reconstruccion):
-
+2. Test local:
 ```powershell
 python VAE_implementation/scripts/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --save_every_packets 1 --idle_stop_s 3 --invert_norm_to_original --compare_split test --plot_every_packets 1
+python VAE_implementation/scripts/10_udp_sender_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --dest_ip 127.0.0.1 --port 5005 --source dataset --split test --block_len 30 --n_blocks 10 --zlib_level 1
 ```
 
-## 5.2 SDR real
-
-Servidor:
-
-```powershell
-python VAE_implementation/scripts/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 0.0.0.0 --port 5005 --save_every_packets 10 --idle_stop_s 10 --invert_norm_to_original
-```
-
-Edge:
-
+3. Produccion SDR:
 ```bash
+python VAE_implementation/scripts/12_acq_sensor_to_zmq.py \
+  --mode callable \
+  --sensor_repo_path /home/pi/SDR-SpectrumMonitoring-Sensor \
+  --callable "mi_modulo.mi_fuente:get_next_psd" \
+  --ipc "ipc:///tmp/ane_psd.ipc" \
+  --out_key psd_dbm
+
 python VAE_implementation/scripts/11_edge_hackrf_psd_zmq_to_udp.py \
   --config VAE_implementation/configs/vae_default.yaml \
   --use_global_best \
@@ -84,24 +61,29 @@ python VAE_implementation/scripts/11_edge_hackrf_psd_zmq_to_udp.py \
   --block_len 30 --zlib_level 1
 ```
 
-## 6. Datos y normalizacion
+## 6. Consideraciones tecnicas
 
-- El bridge `11` espera PSD en escala original (dB/dBm-like).
-- Normaliza usando `gmin/gmax` del dataset procesado.
-- Si ya llega normalizado, usar `--already_normalized`.
+- Normalizacion esperada: `global_minmax` con `gmin/gmax` del dataset procesado.
+- Si PSD ya viene normalizada [0,1], usar `--already_normalized` en script `11`.
+- Ajustar `block_len` y `zlib_level` para balance latencia/compresion.
 
-## 7. Wire protocol
+## 7. Salidas y metricas
 
-- Header `KLP1` + payload zlib
-- `07_pack_unpack.py` define parseo y validaciones
+- `models/GLOBAL_BEST/udp_prod/`
+
+Archivos comunes:
+- `udp_prod_metrics.json`
+- `waterfall_recon.png`
+- `psd_last.png`
+
+Modo comparacion:
+- `waterfall_orig.png`
+- `overlay_pktXXXXXX.png`
+- `orig_last_psd.npy`
+- `recon_last_psd.npy`
 
 ## 8. Troubleshooting
 
-- Falta TFLite: correr `04_export_tflite.py`
-- Sin paquetes: revisar IP/puerto/firewall
-- Bridge sin PSD: revisar JSON o usar `--psd_key`
-- Si ya existe modulo PSD, validar:
-  - endpoint ZMQ exacto (`ipc:///tmp/ane_psd.ipc`)
-  - llave PSD del JSON (o `--psd_key`)
-  - escala de PSD (original o `--already_normalized`)
-
+- Sin trafico UDP: revisar IP/puerto/firewall.
+- Sin PSD en bridge: validar endpoint ZMQ y llave JSON (`--psd_key`).
+- Error TFLite en Windows: usar `tf.lite.Interpreter` fallback.

@@ -755,7 +755,8 @@ def load_measurement_dataframe(
 
     # Parse the PSD column explicitly because pandas does not understand the
     # JSON-encoded array representation used by the acquisition CSV schema.
-    frame["pxx"] = frame["pxx"].apply(_parse_pxx_array)
+    parsed_pxx = [_parse_pxx_array(raw_value) for raw_value in frame["pxx"].tolist()]
+    frame["pxx"] = pd.Series(parsed_pxx, index=frame.index, dtype=object)
 
     # Coerce numeric metadata columns consistently so plotting and comparisons
     # do not depend on pandas' heuristic mixed-type inference.

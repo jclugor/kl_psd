@@ -33,12 +33,13 @@ import numpy as np
 import yaml
 
 import matplotlib
+
 matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt
 
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
+import tensorflow as tf  # type: ignore[import-untyped]
+from tensorflow import keras  # type: ignore[import-untyped]
+from tensorflow.keras import layers  # type: ignore[import-untyped]
 
 
 # -----------------------------
@@ -65,10 +66,14 @@ def _has_conv1d_transpose() -> bool:
     return hasattr(layers, "Conv1DTranspose")
 
 
-def build_encoder(input_bins: int = 1024, latent_dim: int = 32, include_dense128: bool = True) -> keras.Model:
+def build_encoder(
+    input_bins: int = 1024, latent_dim: int = 32, include_dense128: bool = True
+) -> keras.Model:
     x_in = keras.Input(shape=(input_bins, 1), name="x_in")
 
-    x = layers.Conv1D(16, kernel_size=5, strides=2, padding="same", name="enc_conv1")(x_in)
+    x = layers.Conv1D(16, kernel_size=5, strides=2, padding="same", name="enc_conv1")(
+        x_in
+    )
     x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu1")(x)
 
     x = layers.Conv1D(32, kernel_size=3, strides=2, padding="same", name="enc_conv2")(x)
@@ -94,10 +99,14 @@ def build_decoder(input_bins: int = 1024, latent_dim: int = 32) -> keras.Model:
 
     if _has_conv1d_transpose():
         Conv1DTranspose = layers.Conv1DTranspose
-        x = Conv1DTranspose(32, kernel_size=3, strides=2, padding="same", name="dec_deconv1")(x)
+        x = Conv1DTranspose(
+            32, kernel_size=3, strides=2, padding="same", name="dec_deconv1"
+        )(x)
         x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu1")(x)
 
-        x = Conv1DTranspose(16, kernel_size=5, strides=2, padding="same", name="dec_deconv2")(x)
+        x = Conv1DTranspose(
+            16, kernel_size=5, strides=2, padding="same", name="dec_deconv2"
+        )(x)
         x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu2")(x)
     else:
         x = layers.UpSampling1D(size=2, name="dec_ups1")(x)
@@ -118,7 +127,9 @@ def build_decoder(input_bins: int = 1024, latent_dim: int = 32) -> keras.Model:
 def load_dataset(processed_dir: Path) -> Tuple[np.ndarray, Optional[np.ndarray], dict]:
     npz_path = processed_dir / "dataset_psd_1024_norm.npz"
     if not npz_path.exists():
-        candidates = sorted(processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True)
+        candidates = sorted(
+            processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True
+        )
         if not candidates:
             raise FileNotFoundError(f"No .npz found in {processed_dir}")
         npz_path = candidates[0]
@@ -156,7 +167,9 @@ def recon_loss_sum_mse(x: np.ndarray, x_hat: np.ndarray) -> float:
 
 
 def kl_diag_gaussian(mu: np.ndarray, logvar: np.ndarray) -> float:
-    return float(np.mean(-0.5 * np.sum(1.0 + logvar - (mu ** 2) - np.exp(logvar), axis=1)))
+    return float(
+        np.mean(-0.5 * np.sum(1.0 + logvar - (mu**2) - np.exp(logvar), axis=1))
+    )
 
 
 def topk_peak_mse(x: np.ndarray, x_hat: np.ndarray, k: int = 32) -> float:
@@ -178,8 +191,14 @@ def peak_bias(x: np.ndarray, x_hat: np.ndarray) -> float:
 # -----------------------------
 # Plot helpers
 # -----------------------------
-def plot_overlays(save_path: Path, X: np.ndarray, X_hat: np.ndarray, title: str,
-                  freqs_mhz: Optional[np.ndarray] = None, n: int = 6) -> None:
+def plot_overlays(
+    save_path: Path,
+    X: np.ndarray,
+    X_hat: np.ndarray,
+    title: str,
+    freqs_mhz: Optional[np.ndarray] = None,
+    n: int = 6,
+) -> None:
     ensure_dir(save_path.parent)
     n = min(n, X.shape[0])
     rng = np.random.default_rng(2026)
@@ -223,7 +242,9 @@ def plot_hist(save_path: Path, X: np.ndarray, title: str) -> None:
     plt.close()
 
 
-def plot_waterfall(save_path: Path, X: np.ndarray, title: str, max_frames: int = 300) -> None:
+def plot_waterfall(
+    save_path: Path, X: np.ndarray, title: str, max_frames: int = 300
+) -> None:
     ensure_dir(save_path.parent)
     if X.shape[0] > max_frames:
         idx = np.linspace(0, X.shape[0] - 1, max_frames).astype(int)
@@ -251,8 +272,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--run_name", default=None, help="models/runs/<run_name>")
-    ap.add_argument("--use_global_best", action="store_true", help="Evaluate models/GLOBAL_BEST")
-    ap.add_argument("--use_latest", action="store_true", help="Use enc_latest/dec_latest instead of enc_best/dec_best (run only)")
+    ap.add_argument(
+        "--use_global_best", action="store_true", help="Evaluate models/GLOBAL_BEST"
+    )
+    ap.add_argument(
+        "--use_latest",
+        action="store_true",
+        help="Use enc_latest/dec_latest instead of enc_best/dec_best (run only)",
+    )
     ap.add_argument("--topk", type=int, default=32)
     ap.add_argument("--n_plots", type=int, default=6)
     args = ap.parse_args()
@@ -284,7 +311,9 @@ def main():
             dec_w = run_dir / "dec_best.weights.h5"
 
     if not enc_w.exists() or not dec_w.exists():
-        raise FileNotFoundError(f"Missing weights:\n  encoder: {enc_w}\n  decoder: {dec_w}")
+        raise FileNotFoundError(
+            f"Missing weights:\n  encoder: {enc_w}\n  decoder: {dec_w}"
+        )
 
     # Load data
     X, freqs_hz, meta = load_dataset(processed_dir)
@@ -297,7 +326,9 @@ def main():
     latent_dim = 32
     include_dense128 = bool(cfg.get("train", {}).get("include_dense128", True))
 
-    encoder = build_encoder(input_bins=input_bins, latent_dim=latent_dim, include_dense128=include_dense128)
+    encoder = build_encoder(
+        input_bins=input_bins, latent_dim=latent_dim, include_dense128=include_dense128
+    )
     decoder = build_decoder(input_bins=input_bins, latent_dim=latent_dim)
 
     # Build once
@@ -310,7 +341,11 @@ def main():
 
     # Inference in batches
     batch_size = int(cfg.get("train", {}).get("batch_size", 256))
-    ds = tf.data.Dataset.from_tensor_slices(X_test).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+    ds = (
+        tf.data.Dataset.from_tensor_slices(X_test)
+        .batch(batch_size)
+        .prefetch(tf.data.AUTOTUNE)
+    )
 
     mu_all, logvar_all, xhat_all = [], [], []
     for xb in ds:
@@ -351,7 +386,7 @@ def main():
             "topk": int(args.topk),
             "topk_peak_mse": pk_mse,
             "peak_bias_mean_recon_minus_orig": pk_bias,
-        }
+        },
     }
 
     # Output dir
@@ -362,18 +397,34 @@ def main():
     print("[EVAL] Saved metrics:", eval_dir / "metrics.json")
 
     # Plots
-    plot_overlays(eval_dir / "recon_random.png", X_test, X_hat,
-                  f"{tag} ??? random recon overlays", freqs_mhz=freqs_mhz, n=args.n_plots)
+    plot_overlays(
+        eval_dir / "recon_random.png",
+        X_test,
+        X_hat,
+        f"{tag} ??? random recon overlays",
+        freqs_mhz=freqs_mhz,
+        n=args.n_plots,
+    )
 
     # Peaky overlays: top samples by max(orig)
     mx = X_test.max(axis=1).squeeze(-1)
-    top_idx = np.argsort(-mx)[:min(args.n_plots, len(mx))]
-    plot_overlays(eval_dir / "recon_peaky.png", X_test[top_idx], X_hat[top_idx],
-                  f"{tag} ??? peaky overlays (top max)", freqs_mhz=freqs_mhz, n=len(top_idx))
+    top_idx = np.argsort(-mx)[: min(args.n_plots, len(mx))]
+    plot_overlays(
+        eval_dir / "recon_peaky.png",
+        X_test[top_idx],
+        X_hat[top_idx],
+        f"{tag} ??? peaky overlays (top max)",
+        freqs_mhz=freqs_mhz,
+        n=len(top_idx),
+    )
 
     plot_hist(eval_dir / "hist_values.png", X_test, f"{tag} ??? histogram (test)")
-    plot_waterfall(eval_dir / "waterfall_orig.png", X_test, f"{tag} ??? waterfall (orig)")
-    plot_waterfall(eval_dir / "waterfall_recon.png", X_hat, f"{tag} ??? waterfall (recon)")
+    plot_waterfall(
+        eval_dir / "waterfall_orig.png", X_test, f"{tag} ??? waterfall (orig)"
+    )
+    plot_waterfall(
+        eval_dir / "waterfall_recon.png", X_hat, f"{tag} ??? waterfall (recon)"
+    )
 
     print("[EVAL] Plots saved in:", eval_dir)
     print("[EVAL] recon_loss:", recon, "kl_loss:", kl, "total:", total)

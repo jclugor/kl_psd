@@ -19,6 +19,7 @@ import numpy as np
 import yaml
 import zmq
 
+
 def repo_root() -> Path:
     """Return the bundle root for repository-relative config paths."""
 
@@ -56,7 +57,9 @@ def load_pack_module() -> object:
 def load_npz_dict(processed_dir: Path) -> dict:
     npz_path = processed_dir / "dataset_psd_1024_norm.npz"
     if not npz_path.exists():
-        candidates = sorted(processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True)
+        candidates = sorted(
+            processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True
+        )
         if not candidates:
             raise FileNotFoundError(f"No .npz found in {processed_dir}")
         npz_path = candidates[0]
@@ -105,7 +108,16 @@ def normalize_global_minmax(x: np.ndarray, gmin: float, gmax: float) -> np.ndarr
 def guess_psd_array(obj: dict, preferred_key: str | None) -> np.ndarray | None:
     if preferred_key and preferred_key in obj:
         return np.asarray(obj[preferred_key], dtype=np.float32)
-    for k in ("psd_dbm", "psd", "p_out", "power_dbm", "p_dbm", "spectrum_dbm", "bins_dbm", "pxx"):
+    for k in (
+        "psd_dbm",
+        "psd",
+        "p_out",
+        "power_dbm",
+        "p_dbm",
+        "spectrum_dbm",
+        "bins_dbm",
+        "pxx",
+    ):
         if k in obj:
             return np.asarray(obj[k], dtype=np.float32)
     return None
@@ -160,7 +172,9 @@ def main():
         gmin = float(npz.get("gmin", np.nan))
         gmax = float(npz.get("gmax", np.nan))
         if mode != "global_minmax" or not np.isfinite(gmin + gmax):
-            raise ValueError("Need global_minmax metadata in npz or use --already_normalized")
+            raise ValueError(
+                "Need global_minmax metadata in npz or use --already_normalized"
+            )
 
     L = int(args.block_len)
     if L <= 0 or L > 255:
@@ -203,14 +217,18 @@ def main():
 
         x = np.asarray(psd, dtype=np.float32).reshape(-1)
         x = resample_to_1024(x)
-        x_norm = x if args.already_normalized else normalize_global_minmax(x, gmin, gmax)
+        x_norm = (
+            x if args.already_normalized else normalize_global_minmax(x, gmin, gmax)
+        )
 
         mu_block[bi] = infer_mu_int8_one(interp, in_det, out_det, x_norm)
         bi += 1
         frames += 1
 
         if bi >= L:
-            pkt = packmod.pack_packet(mu_block, seq=seq, zlib_level=args.zlib_level, keyframe=True)
+            pkt = packmod.pack_packet(
+                mu_block, seq=seq, zlib_level=args.zlib_level, keyframe=True
+            )
             udp.sendto(pkt, dest)
             bytes_total += len(pkt)
             seq += 1
@@ -219,8 +237,8 @@ def main():
             if args.log_every_packets > 0 and (seq % args.log_every_packets == 0):
                 dt = max(1e-9, time.perf_counter() - t0)
                 print(
-                    f"[EDGE11] pkts={seq} frames={frames} avgB/f={bytes_total/max(1,frames):.2f} "
-                    f"frames/s={frames/dt:.1f} KB/s={bytes_total/dt/1024:.2f}"
+                    f"[EDGE11] pkts={seq} frames={frames} avgB/f={bytes_total / max(1, frames):.2f} "
+                    f"frames/s={frames / dt:.1f} KB/s={bytes_total / dt / 1024:.2f}"
                 )
 
     print("[EDGE11] stopped.")

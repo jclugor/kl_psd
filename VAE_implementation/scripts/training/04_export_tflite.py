@@ -33,14 +33,13 @@ Notes:
 import argparse
 import json
 from pathlib import Path
-from typing import Optional, Tuple
 
 import numpy as np
 import yaml
 
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
+import tensorflow as tf  # type: ignore[import-untyped]
+from tensorflow import keras  # type: ignore[import-untyped]
+from tensorflow.keras import layers  # type: ignore[import-untyped]
 
 
 # -----------------------------
@@ -63,10 +62,14 @@ def safe_write_json(path: Path, obj) -> None:
 # -----------------------------
 # Architecture (must match training)
 # -----------------------------
-def build_encoder(input_bins: int = 1024, latent_dim: int = 32, include_dense128: bool = True) -> keras.Model:
+def build_encoder(
+    input_bins: int = 1024, latent_dim: int = 32, include_dense128: bool = True
+) -> keras.Model:
     x_in = keras.Input(shape=(input_bins, 1), name="x_in")
 
-    x = layers.Conv1D(16, kernel_size=5, strides=2, padding="same", name="enc_conv1")(x_in)
+    x = layers.Conv1D(16, kernel_size=5, strides=2, padding="same", name="enc_conv1")(
+        x_in
+    )
     x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu1")(x)
 
     x = layers.Conv1D(32, kernel_size=3, strides=2, padding="same", name="enc_conv2")(x)
@@ -96,7 +99,9 @@ def build_encoder_mu_only(encoder: keras.Model, input_bins: int = 1024) -> keras
 def load_npz(processed_dir: Path) -> np.ndarray:
     npz_path = processed_dir / "dataset_psd_1024_norm.npz"
     if not npz_path.exists():
-        candidates = sorted(processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True)
+        candidates = sorted(
+            processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True
+        )
         if not candidates:
             raise FileNotFoundError(f"No .npz found in {processed_dir}")
         npz_path = candidates[0]
@@ -142,7 +147,7 @@ def tflite_infer_mu(tflite_path: Path, X_batch: np.ndarray) -> np.ndarray:
     mu_out = []
 
     for i in range(X_batch.shape[0]):
-        x = X_batch[i:i+1]  # (1,1024,1)
+        x = X_batch[i : i + 1]  # (1,1024,1)
         # Quantize input to int8/uint8 depending on model
         if input_details["dtype"] == np.int8:
             xq = np.round(x / in_scale + in_zp).astype(np.int8)
@@ -170,11 +175,25 @@ def tflite_infer_mu(tflite_path: Path, X_batch: np.ndarray) -> np.ndarray:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
-    ap.add_argument("--run_name", default=None, help="models/runs/<run_name> (default from config)")
-    ap.add_argument("--use_global_best", action="store_true", help="Load weights from models/GLOBAL_BEST")
-    ap.add_argument("--use_latest", action="store_true", help="Use latest weights instead of best (run only)")
-    ap.add_argument("--n_rep", type=int, default=512, help="Representative samples for PTQ")
-    ap.add_argument("--n_val", type=int, default=64, help="Validation batch size for comparing mu")
+    ap.add_argument(
+        "--run_name", default=None, help="models/runs/<run_name> (default from config)"
+    )
+    ap.add_argument(
+        "--use_global_best",
+        action="store_true",
+        help="Load weights from models/GLOBAL_BEST",
+    )
+    ap.add_argument(
+        "--use_latest",
+        action="store_true",
+        help="Use latest weights instead of best (run only)",
+    )
+    ap.add_argument(
+        "--n_rep", type=int, default=512, help="Representative samples for PTQ"
+    )
+    ap.add_argument(
+        "--n_val", type=int, default=64, help="Validation batch size for comparing mu"
+    )
     args = ap.parse_args()
 
     root = repo_root()
@@ -199,7 +218,9 @@ def main():
         run_name = args.run_name or cfg.get("train", {}).get("run_name", "run_current")
         tag = f"RUN:{run_name}" + (":latest" if args.use_latest else ":best")
         out_dir = models_dir / "runs" / run_name
-        enc_w = out_dir / ("enc_latest.weights.h5" if args.use_latest else "enc_best.weights.h5")
+        enc_w = out_dir / (
+            "enc_latest.weights.h5" if args.use_latest else "enc_best.weights.h5"
+        )
 
     ensure_dir(out_dir)
 
@@ -210,12 +231,16 @@ def main():
     X = load_npz(processed_dir)
 
     # Build encoder + load weights
-    encoder = build_encoder(input_bins=input_bins, latent_dim=latent_dim, include_dense128=include_dense128)
+    encoder = build_encoder(
+        input_bins=input_bins, latent_dim=latent_dim, include_dense128=include_dense128
+    )
     _ = encoder(tf.zeros((1, input_bins, 1), dtype=tf.float32), training=False)  # build
     encoder.load_weights(enc_w)
 
     encoder_mu = build_encoder_mu_only(encoder, input_bins=input_bins)
-    _ = encoder_mu(tf.zeros((1, input_bins, 1), dtype=tf.float32), training=False)  # build
+    _ = encoder_mu(
+        tf.zeros((1, input_bins, 1), dtype=tf.float32), training=False
+    )  # build
 
     # Export Keras (optional)
     keras_path = out_dir / "encoder_mu.keras"
@@ -228,7 +253,9 @@ def main():
     # Convert to TFLite INT8 (PTQ)
     converter = tf.lite.TFLiteConverter.from_keras_model(encoder_mu)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    converter.representative_dataset = lambda: representative_dataset_gen(X, n_samples=args.n_rep)
+    converter.representative_dataset = lambda: representative_dataset_gen(
+        X, n_samples=args.n_rep
+    )
 
     # Full integer quantization
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
@@ -247,11 +274,11 @@ def main():
     Xb = X[idx][:, :, None].astype(np.float32)  # (B,1024,1)
 
     mu_float = encoder_mu.predict(Xb, verbose=0)  # (B,32)
-    mu_tfl = tflite_infer_mu(tflite_path, Xb)     # (B,32)
+    mu_tfl = tflite_infer_mu(tflite_path, Xb)  # (B,32)
 
     diff = mu_tfl - mu_float
     mae = float(np.mean(np.abs(diff)))
-    rmse = float(np.sqrt(np.mean(diff ** 2)))
+    rmse = float(np.sqrt(np.mean(diff**2)))
     max_abs = float(np.max(np.abs(diff)))
 
     report = {
@@ -266,8 +293,8 @@ def main():
             "n_val": int(n_val),
             "mu_mae": mae,
             "mu_rmse": rmse,
-            "mu_max_abs": max_abs
-        }
+            "mu_max_abs": max_abs,
+        },
     }
 
     report_path = out_dir / "export_report.json"

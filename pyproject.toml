@@ -36,3 +36,18 @@ include = ["api*", "psd_compression*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+exclude = [
+    '^deploy/',
+    '^VAE_implementation/models/GLOBAL_BEST/udp_prod/compare_npy_metrics_plot\.py$',
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "tensorflow",
+    "tensorflow.*",
+    "tflite_runtime",
+    "tflite_runtime.*",
+]
+ignore_missing_imports = true

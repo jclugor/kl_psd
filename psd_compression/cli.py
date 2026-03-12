@@ -29,28 +29,44 @@ def _build_parser() -> argparse.ArgumentParser:
     fwht = sub.add_parser("fwht", help="Deterministic FWHT codec tasks.")
     fwht_sub = fwht.add_subparsers(dest="fwht_task", required=True)
 
-    fwht_encode = fwht_sub.add_parser("encode", help="Encode one PSD frame into FWHT packet.")
+    fwht_encode = fwht_sub.add_parser(
+        "encode", help="Encode one PSD frame into FWHT packet."
+    )
     fwht_encode.add_argument("--config", default="configs/fwht_default.yaml")
     fwht_encode.add_argument("--frame-index", type=int, default=0)
-    fwht_encode.add_argument("--output", default="data/processed/psd_1024/fwht_packet_frame0.npz")
+    fwht_encode.add_argument(
+        "--output", default="data/processed/psd_1024/fwht_packet_frame0.npz"
+    )
     fwht_encode.add_argument("--dry-run", action="store_true")
 
-    fwht_decode = fwht_sub.add_parser("decode", help="Decode one FWHT packet into reconstructed frame.")
-    fwht_decode.add_argument("--packet", default="data/processed/psd_1024/fwht_packet_frame0.npz")
-    fwht_decode.add_argument("--output", default="data/processed/psd_1024/fwht_reconstruction_frame0.npy")
+    fwht_decode = fwht_sub.add_parser(
+        "decode", help="Decode one FWHT packet into reconstructed frame."
+    )
+    fwht_decode.add_argument(
+        "--packet", default="data/processed/psd_1024/fwht_packet_frame0.npz"
+    )
+    fwht_decode.add_argument(
+        "--output", default="data/processed/psd_1024/fwht_reconstruction_frame0.npy"
+    )
     fwht_decode.add_argument("--dry-run", action="store_true")
 
-    fwht_eval = fwht_sub.add_parser("evaluate", help="Evaluate FWHT codec over multiple frames.")
+    fwht_eval = fwht_sub.add_parser(
+        "evaluate", help="Evaluate FWHT codec over multiple frames."
+    )
     fwht_eval.add_argument("--config", default="configs/fwht_default.yaml")
     fwht_eval.add_argument("--max-frames", type=int, default=None)
-    fwht_eval.add_argument("--output", default=None, help="Optional report output JSON path.")
+    fwht_eval.add_argument(
+        "--output", default=None, help="Optional report output JSON path."
+    )
     fwht_eval.add_argument("--dry-run", action="store_true")
 
     # VAE wrappers
     vae = sub.add_parser("vae", help="VAE wrapper tasks delegating to legacy scripts.")
     vae_sub = vae.add_subparsers(dest="vae_task", required=True)
     for task in ("preprocess", "train", "eval", "export", "entropy", "benchmark"):
-        task_parser = vae_sub.add_parser(task, help=f"Delegate to legacy VAE `{task}` script.")
+        task_parser = vae_sub.add_parser(
+            task, help=f"Delegate to legacy VAE `{task}` script."
+        )
         task_parser.add_argument("--dry-run", action="store_true")
 
     # KL/PCA module tasks
@@ -63,21 +79,35 @@ def _build_parser() -> argparse.ArgumentParser:
     kl_fit.add_argument("--max-frames", type=int, default=None)
     kl_fit.add_argument("--dry-run", action="store_true")
 
-    kl_encode = kl_sub.add_parser("encode", help="Encode one frame into KL/PCA coefficients.")
+    kl_encode = kl_sub.add_parser(
+        "encode", help="Encode one frame into KL/PCA coefficients."
+    )
     kl_encode.add_argument("--config", default="configs/kl_pca_default.yaml")
-    kl_encode.add_argument("--model", default=None, help="Optional model path override.")
+    kl_encode.add_argument(
+        "--model", default=None, help="Optional model path override."
+    )
     kl_encode.add_argument("--frame-index", type=int, default=0)
     kl_encode.add_argument("--output", default=None, help="Optional coeff output path.")
     kl_encode.add_argument("--dry-run", action="store_true")
 
-    kl_decode = kl_sub.add_parser("decode", help="Decode one KL/PCA coefficient vector into PSD frame.")
+    kl_decode = kl_sub.add_parser(
+        "decode", help="Decode one KL/PCA coefficient vector into PSD frame."
+    )
     kl_decode.add_argument("--config", default="configs/kl_pca_default.yaml")
-    kl_decode.add_argument("--model", default=None, help="Optional model path override.")
-    kl_decode.add_argument("--coeff", default=None, help="Optional coefficient path override.")
-    kl_decode.add_argument("--output", default=None, help="Optional reconstructed frame output path.")
+    kl_decode.add_argument(
+        "--model", default=None, help="Optional model path override."
+    )
+    kl_decode.add_argument(
+        "--coeff", default=None, help="Optional coefficient path override."
+    )
+    kl_decode.add_argument(
+        "--output", default=None, help="Optional reconstructed frame output path."
+    )
     kl_decode.add_argument("--dry-run", action="store_true")
 
-    kl_eval = kl_sub.add_parser("evaluate", help="Evaluate KL/PCA reconstruction on multiple frames.")
+    kl_eval = kl_sub.add_parser(
+        "evaluate", help="Evaluate KL/PCA reconstruction on multiple frames."
+    )
     kl_eval.add_argument("--config", default="configs/kl_pca_default.yaml")
     kl_eval.add_argument("--model", default=None, help="Optional model path override.")
     kl_eval.add_argument("--max-frames", type=int, default=None)
@@ -93,13 +123,24 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.group == "fwht":
         if args.fwht_task == "encode":
-            _print_json(run_encode(args.config, args.frame_index, args.output, dry_run=args.dry_run))
+            _print_json(
+                run_encode(
+                    args.config, args.frame_index, args.output, dry_run=args.dry_run
+                )
+            )
             return 0
         if args.fwht_task == "decode":
             _print_json(run_decode(args.packet, args.output, dry_run=args.dry_run))
             return 0
         if args.fwht_task == "evaluate":
-            _print_json(run_evaluate(args.config, max_frames=args.max_frames, output_path=args.output, dry_run=args.dry_run))
+            _print_json(
+                run_evaluate(
+                    args.config,
+                    max_frames=args.max_frames,
+                    output_path=args.output,
+                    dry_run=args.dry_run,
+                )
+            )
             return 0
         parser.error(f"Unsupported fwht task: {args.fwht_task}")
 
@@ -112,7 +153,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.group == "kl-pca":
         if args.kl_task == "fit":
-            _print_json(run_kl_fit(args.config, output_path=args.output, max_frames=args.max_frames, dry_run=args.dry_run))
+            _print_json(
+                run_kl_fit(
+                    args.config,
+                    output_path=args.output,
+                    max_frames=args.max_frames,
+                    dry_run=args.dry_run,
+                )
+            )
             return 0
         if args.kl_task == "encode":
             _print_json(

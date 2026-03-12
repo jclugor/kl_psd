@@ -32,13 +32,15 @@ import numpy as np
 import yaml
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from tensorflow import keras
-from tensorflow.keras import layers
+from importlib.machinery import ModuleSpec
+from tensorflow import keras  # type: ignore[import-untyped]
+from tensorflow.keras import layers  # type: ignore[import-untyped]
 
-import tensorflow as tf
+import tensorflow as tf  # type: ignore[import-untyped]
 
 
 def repo_root() -> Path:
@@ -51,7 +53,9 @@ def _resolve_tflite_interpreter() -> type:
     """Load the preferred TFLite interpreter class on demand."""
 
     try:
-        from tflite_runtime.interpreter import Interpreter as interpreter_cls
+        from tflite_runtime.interpreter import (  # type: ignore[import-not-found]
+            Interpreter as interpreter_cls,
+        )
 
         return interpreter_cls
     except ModuleNotFoundError:
@@ -66,8 +70,11 @@ def load_pack_module() -> object:
     root = repo_root()
     mod_path = root / "VAE_implementation" / "scripts" / "codec" / "07_pack_unpack.py"
     spec = importlib.util.spec_from_file_location("packmod", str(mod_path))
+    if spec is None or not isinstance(spec.loader, object):
+        raise ImportError(f"Could not load packet codec module from {mod_path}")
     mod = importlib.util.module_from_spec(spec)
-    assert spec and spec.loader
+    if not isinstance(spec, ModuleSpec) or spec.loader is None:
+        raise ImportError(f"Invalid import spec for packet codec module: {mod_path}")
     spec.loader.exec_module(mod)
     return mod
 
@@ -83,9 +90,13 @@ def build_decoder(latent_dim: int = 32) -> keras.Model:
 
     if _has_conv1d_transpose():
         Conv1DTranspose = layers.Conv1DTranspose
-        x = Conv1DTranspose(32, kernel_size=3, strides=2, padding="same", name="dec_deconv1")(x)
+        x = Conv1DTranspose(
+            32, kernel_size=3, strides=2, padding="same", name="dec_deconv1"
+        )(x)
         x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu1")(x)
-        x = Conv1DTranspose(16, kernel_size=5, strides=2, padding="same", name="dec_deconv2")(x)
+        x = Conv1DTranspose(
+            16, kernel_size=5, strides=2, padding="same", name="dec_deconv2"
+        )(x)
         x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu2")(x)
     else:
         x = layers.UpSampling1D(size=2, name="dec_ups1")(x)
@@ -102,7 +113,9 @@ def build_decoder(latent_dim: int = 32) -> keras.Model:
 def load_npz(processed_dir: Path) -> dict:
     npz_path = processed_dir / "dataset_psd_1024_norm.npz"
     if not npz_path.exists():
-        candidates = sorted(processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True)
+        candidates = sorted(
+            processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True
+        )
         if not candidates:
             raise FileNotFoundError(f"No .npz found in {processed_dir}")
         npz_path = candidates[0]
@@ -132,16 +145,37 @@ def main():
     ap.add_argument("--port", type=int, default=5005)
 
     ap.add_argument("--socket_timeout_s", type=float, default=1.0)
-    ap.add_argument("--idle_stop_s", type=float, default=0.0, help="Stop if no packets for X seconds (0=never).")
-    ap.add_argument("--max_packets", type=int, default=0, help="0=run until idle_stop or Ctrl+C")
+    ap.add_argument(
+        "--idle_stop_s",
+        type=float,
+        default=0.0,
+        help="Stop if no packets for X seconds (0=never).",
+    )
+    ap.add_argument(
+        "--max_packets", type=int, default=0, help="0=run until idle_stop or Ctrl+C"
+    )
 
     ap.add_argument("--waterfall_max_frames", type=int, default=300)
-    ap.add_argument("--save_every_packets", type=int, default=10, help="Save plots every N packets.")
-    ap.add_argument("--invert_norm_to_original", action="store_true", help="Use gmin/gmax from npz to return to original scale.")
-    ap.add_argument("--compare_split", choices=["train", "val", "test"], default=None,
-                    help="Optional local-test mode: compare against original frames from this split.")
-    ap.add_argument("--plot_every_packets", type=int, default=1,
-                    help="Save overlay every N packets in compare mode.")
+    ap.add_argument(
+        "--save_every_packets", type=int, default=10, help="Save plots every N packets."
+    )
+    ap.add_argument(
+        "--invert_norm_to_original",
+        action="store_true",
+        help="Use gmin/gmax from npz to return to original scale.",
+    )
+    ap.add_argument(
+        "--compare_split",
+        choices=["train", "val", "test"],
+        default=None,
+        help="Optional local-test mode: compare against original frames from this split.",
+    )
+    ap.add_argument(
+        "--plot_every_packets",
+        type=int,
+        default=1,
+        help="Save overlay every N packets in compare mode.",
+    )
     args = ap.parse_args()
 
     root = repo_root()
@@ -191,7 +225,9 @@ def main():
     gmax = float(npz.get("gmax", np.nan))
     if args.invert_norm_to_original:
         if norm_mode != "global_minmax" or not np.isfinite(gmin + gmax):
-            print("[RECV10] WARN invert_norm_to_original requested but npz lacks valid global_minmax params. Will save normalized scale.")
+            print(
+                "[RECV10] WARN invert_norm_to_original requested but npz lacks valid global_minmax params. Will save normalized scale."
+            )
             args.invert_norm_to_original = False
         else:
             print("[RECV10] Inverting normalization to original scale using gmin/gmax.")
@@ -201,11 +237,15 @@ def main():
     ref_cursor = 0
     if compare_enabled:
         tr, va, te = load_splits(processed_dir)
-        split_idx = {"train": tr, "val": va, "test": te}[args.compare_split].astype(np.int64)
+        split_idx = {"train": tr, "val": va, "test": te}[args.compare_split].astype(
+            np.int64
+        )
         X_ref = npz["X"].astype(np.float32)[split_idx]
         if args.invert_norm_to_original:
             X_ref = invert_global_minmax(X_ref, gmin, gmax)
-        print(f"[RECV10] Compare mode enabled with split={args.compare_split}, frames={X_ref.shape[0]}")
+        print(
+            f"[RECV10] Compare mode enabled with split={args.compare_split}, frames={X_ref.shape[0]}"
+        )
 
     # UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -234,7 +274,11 @@ def main():
         while True:
             if args.max_packets > 0 and packets >= args.max_packets:
                 break
-            if args.idle_stop_s > 0 and (time.perf_counter() - last_recv) > args.idle_stop_s and packets > 0:
+            if (
+                args.idle_stop_s > 0
+                and (time.perf_counter() - last_recv) > args.idle_stop_s
+                and packets > 0
+            ):
                 print("[RECV10] Idle stop.")
                 break
 
@@ -260,7 +304,9 @@ def main():
             last_seq = hdr.seq
 
             # Dequant mu
-            mu_f = (mu_block.astype(np.float32) - float(out_zp)) * float(out_scale)  # (L,32)
+            mu_f = (mu_block.astype(np.float32) - float(out_zp)) * float(
+                out_scale
+            )  # (L,32)
 
             # Decode to normalized PSD
             x_norm = decoder(mu_f, training=False).numpy()[:, :, 0]  # (L,1024)
@@ -277,18 +323,24 @@ def main():
             wf.append(x_out)
             if compare_enabled and X_ref is not None and ref_cursor < X_ref.shape[0]:
                 n_take = min(L, X_ref.shape[0] - ref_cursor)
-                x_orig = X_ref[ref_cursor:ref_cursor + n_take]
+                x_orig = X_ref[ref_cursor : ref_cursor + n_take]
                 ref_cursor += n_take
                 last_orig = x_orig[-1].copy()
                 wf_orig.append(x_orig)
 
-                if args.plot_every_packets > 0 and (packets % args.plot_every_packets == 0):
+                if args.plot_every_packets > 0 and (
+                    packets % args.plot_every_packets == 0
+                ):
                     plt.figure(figsize=(10, 3))
                     plt.plot(x_orig[0], label="orig")
                     plt.plot(x_out[0], label="recon")
                     plt.title(f"Overlay packet {packets} (frame 0)")
                     plt.xlabel("bin")
-                    plt.ylabel("value" if not args.invert_norm_to_original else "original scale")
+                    plt.ylabel(
+                        "value"
+                        if not args.invert_norm_to_original
+                        else "original scale"
+                    )
                     plt.grid(True)
                     plt.legend()
                     plt.tight_layout()
@@ -297,7 +349,10 @@ def main():
             # trim by frame count
             while sum(a.shape[0] for a in wf) > args.waterfall_max_frames:
                 wf.pop(0)
-            while compare_enabled and sum(a.shape[0] for a in wf_orig) > args.waterfall_max_frames:
+            while (
+                compare_enabled
+                and sum(a.shape[0] for a in wf_orig) > args.waterfall_max_frames
+            ):
                 wf_orig.pop(0)
 
             # Save plots periodically
@@ -317,7 +372,9 @@ def main():
                 if compare_enabled and wf_orig:
                     W0 = np.vstack(wf_orig)
                     plt.figure(figsize=(10, 5))
-                    plt.imshow(W0, aspect="auto", origin="lower", interpolation="nearest")
+                    plt.imshow(
+                        W0, aspect="auto", origin="lower", interpolation="nearest"
+                    )
                     plt.title("Waterfall ORIG (recent frames)")
                     plt.xlabel("bin")
                     plt.ylabel("frame")
@@ -330,7 +387,9 @@ def main():
                 plt.plot(last_psd)
                 plt.title("Last reconstructed PSD (production)")
                 plt.xlabel("bin")
-                plt.ylabel("value" if not args.invert_norm_to_original else "original scale")
+                plt.ylabel(
+                    "value" if not args.invert_norm_to_original else "original scale"
+                )
                 plt.grid(True)
                 plt.tight_layout()
                 plt.savefig(out_dir / "psd_last.png", dpi=180)
@@ -346,24 +405,37 @@ def main():
                     "frames": int(frames),
                     "bytes_total": int(bytes_total),
                     "avg_bytes_per_frame": float(bytes_total / max(1, frames)),
-                    "frames_per_second": float(frames / max(1e-9, (time.perf_counter() - t0))),
+                    "frames_per_second": float(
+                        frames / max(1e-9, (time.perf_counter() - t0))
+                    ),
                     "seq_gaps": int(seq_gaps),
                     "out_of_order": int(out_of_order),
-                    "dequant": {"out_scale": float(out_scale), "out_zero_point": int(out_zp)},
-                    "scale": "original" if args.invert_norm_to_original else "normalized",
+                    "dequant": {
+                        "out_scale": float(out_scale),
+                        "out_zero_point": int(out_zp),
+                    },
+                    "scale": "original"
+                    if args.invert_norm_to_original
+                    else "normalized",
                 }
                 if compare_enabled and X_ref is not None:
                     metrics["compare_split"] = args.compare_split
-                    metrics["compare_frames_used"] = int(min(ref_cursor, X_ref.shape[0]))
-                (out_dir / "udp_prod_metrics.json").write_text(json.dumps(metrics, indent=2))
+                    metrics["compare_frames_used"] = int(
+                        min(ref_cursor, X_ref.shape[0])
+                    )
+                (out_dir / "udp_prod_metrics.json").write_text(
+                    json.dumps(metrics, indent=2)
+                )
                 print("[RECV10] Saved plots/metrics:", out_dir)
 
     except KeyboardInterrupt:
         print("[RECV10] Ctrl+C, stopping...")
 
     dt = time.perf_counter() - t0
-    print(f"[RECV10] DONE packets={packets} frames={frames} bytes={bytes_total} "
-          f"| frames/s={frames/max(1e-9,dt):.1f} | avg bytes/frame={bytes_total/max(1,frames):.3f}")
+    print(
+        f"[RECV10] DONE packets={packets} frames={frames} bytes={bytes_total} "
+        f"| frames/s={frames / max(1e-9, dt):.1f} | avg bytes/frame={bytes_total / max(1, frames):.3f}"
+    )
     print("[RECV10] seq_gaps:", seq_gaps, "| out_of_order:", out_of_order)
     print("[RECV10] outputs:", out_dir)
 

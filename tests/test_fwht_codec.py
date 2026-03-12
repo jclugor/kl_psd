@@ -38,4 +38,3 @@ def test_fwht_payload_bits_scales_with_topk() -> None:
 
     assert bits_small > 0
     assert bits_large > bits_small
-

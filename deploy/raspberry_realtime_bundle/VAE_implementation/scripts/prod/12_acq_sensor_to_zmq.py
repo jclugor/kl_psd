@@ -26,7 +26,16 @@ import numpy as np
 import zmq
 
 
-DEFAULT_KEYS = ("psd_dbm", "psd", "p_out", "power_dbm", "p_dbm", "spectrum_dbm", "bins_dbm", "pxx")
+DEFAULT_KEYS = (
+    "psd_dbm",
+    "psd",
+    "p_out",
+    "power_dbm",
+    "p_dbm",
+    "spectrum_dbm",
+    "bins_dbm",
+    "pxx",
+)
 
 
 def _to_np1d(x: Any) -> np.ndarray | None:
@@ -80,7 +89,9 @@ def iter_from_callable(fn, kwargs: dict) -> Iterator[Any]:
             yield item
         return
 
-    if isinstance(obj, Iterable) and not isinstance(obj, (dict, list, tuple, np.ndarray, str, bytes)):
+    if isinstance(obj, Iterable) and not isinstance(
+        obj, (dict, list, tuple, np.ndarray, str, bytes)
+    ):
         for item in obj:
             yield item
         return
@@ -121,16 +132,36 @@ def iter_from_script(command: str) -> Iterator[Any]:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["callable", "script"], required=True)
-    ap.add_argument("--ipc", default="ipc:///tmp/ane_psd.ipc", help="PAIR endpoint where edge script is bound.")
-    ap.add_argument("--out_key", default="psd_dbm", help="JSON key emitted to edge bridge.")
-    ap.add_argument("--in_key", default=None, help="Preferred input key in source frames.")
-    ap.add_argument("--sleep_ms", type=float, default=0.0, help="Throttle optional publisher delay.")
+    ap.add_argument(
+        "--ipc",
+        default="ipc:///tmp/ane_psd.ipc",
+        help="PAIR endpoint where edge script is bound.",
+    )
+    ap.add_argument(
+        "--out_key", default="psd_dbm", help="JSON key emitted to edge bridge."
+    )
+    ap.add_argument(
+        "--in_key", default=None, help="Preferred input key in source frames."
+    )
+    ap.add_argument(
+        "--sleep_ms", type=float, default=0.0, help="Throttle optional publisher delay."
+    )
     ap.add_argument("--log_every", type=int, default=100)
 
-    ap.add_argument("--sensor_repo_path", default=None, help="Path to external sensor repo to append to sys.path.")
-    ap.add_argument("--callable", dest="callable_target", default=None, help="module:function")
-    ap.add_argument("--callable_kwargs_json", default="{}", help="JSON dict kwargs for callable.")
-    ap.add_argument("--script_cmd", default=None, help="Command producing JSON lines with PSD.")
+    ap.add_argument(
+        "--sensor_repo_path",
+        default=None,
+        help="Path to external sensor repo to append to sys.path.",
+    )
+    ap.add_argument(
+        "--callable", dest="callable_target", default=None, help="module:function"
+    )
+    ap.add_argument(
+        "--callable_kwargs_json", default="{}", help="JSON dict kwargs for callable."
+    )
+    ap.add_argument(
+        "--script_cmd", default=None, help="Command producing JSON lines with PSD."
+    )
     args = ap.parse_args()
 
     if args.mode == "callable" and not args.callable_target:
@@ -172,7 +203,7 @@ def main():
 
             if args.log_every > 0 and (n % args.log_every == 0):
                 dt = max(1e-9, time.perf_counter() - t0)
-                print(f"[ACQ12] sent={n} fps={n/dt:.1f} bins={psd.shape[0]}")
+                print(f"[ACQ12] sent={n} fps={n / dt:.1f} bins={psd.shape[0]}")
 
     except KeyboardInterrupt:
         pass

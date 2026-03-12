@@ -11,6 +11,7 @@ import numpy as np
 from psd_compression.common.metrics import mse, nmse, occupancy_mismatch_rate, snr_db
 
 Array1D = np.ndarray
+NonlinearMode = Literal["identity", "signed_log1p", "asinh"]
 
 
 @dataclass(frozen=True)
@@ -24,7 +25,7 @@ class FWHTConfig:
     decimation_factor_bins: int = 2
     top_k_coeffs: int = 128
     quant_step: float = 0.02
-    nonlinear_mode: Literal["identity", "signed_log1p", "asinh"] = "signed_log1p"
+    nonlinear_mode: NonlinearMode = "signed_log1p"
     nonlinear_alpha: float = 1.5
     side_info_bits_per_param: int = 16
     value_bits_per_coeff: int = 16
@@ -39,7 +40,7 @@ class FWHTPacket:
     topk_indices: Array1D
     quantized_values: Array1D
     quant_step: float
-    nonlinear_mode: Literal["identity", "signed_log1p", "asinh"]
+    nonlinear_mode: NonlinearMode
     nonlinear_alpha: float
 
 
@@ -75,32 +76,42 @@ def standardize_frame(frame: Array1D) -> Tuple[Array1D, StandardizationSideInfo]
     sigma = float(np.std(frame))
     if sigma < 1e-12:
         sigma = 1.0
-    return ((frame - mu) / sigma).astype(np.float64), StandardizationSideInfo(mean=mu, std=sigma)
+    return ((frame - mu) / sigma).astype(np.float64), StandardizationSideInfo(
+        mean=mu, std=sigma
+    )
 
 
-def destandardize_frame(frame_standardized: Array1D, side_info: StandardizationSideInfo) -> Array1D:
+def destandardize_frame(
+    frame_standardized: Array1D, side_info: StandardizationSideInfo
+) -> Array1D:
     return (frame_standardized * side_info.std + side_info.mean).astype(np.float64)
 
 
-def apply_nonlinear_map(values: Array1D, mode: Literal["identity", "signed_log1p", "asinh"], alpha: float) -> Array1D:
+def apply_nonlinear_map(values: Array1D, mode: NonlinearMode, alpha: float) -> Array1D:
     if alpha <= 0.0:
         raise ValueError("alpha must be > 0")
     if mode == "identity":
         return values.astype(np.float64)
     if mode == "signed_log1p":
-        return (np.sign(values) * np.log1p(alpha * np.abs(values)) / alpha).astype(np.float64)
+        return (np.sign(values) * np.log1p(alpha * np.abs(values)) / alpha).astype(
+            np.float64
+        )
     if mode == "asinh":
         return (np.arcsinh(alpha * values) / alpha).astype(np.float64)
     raise ValueError(f"Unsupported nonlinear mode: {mode}")
 
 
-def invert_nonlinear_map(transformed: Array1D, mode: Literal["identity", "signed_log1p", "asinh"], alpha: float) -> Array1D:
+def invert_nonlinear_map(
+    transformed: Array1D, mode: NonlinearMode, alpha: float
+) -> Array1D:
     if alpha <= 0.0:
         raise ValueError("alpha must be > 0")
     if mode == "identity":
         return transformed.astype(np.float64)
     if mode == "signed_log1p":
-        return (np.sign(transformed) * (np.expm1(alpha * np.abs(transformed)) / alpha)).astype(np.float64)
+        return (
+            np.sign(transformed) * (np.expm1(alpha * np.abs(transformed)) / alpha)
+        ).astype(np.float64)
     if mode == "asinh":
         return (np.sinh(alpha * transformed) / alpha).astype(np.float64)
     raise ValueError(f"Unsupported nonlinear mode: {mode}")
@@ -149,7 +160,9 @@ def inverse_fwht_orthonormal(values: Array1D) -> Array1D:
     return fwht_orthonormal(values)
 
 
-def select_topk_coefficients(coefficients: Array1D, top_k: int) -> Tuple[Array1D, Array1D]:
+def select_topk_coefficients(
+    coefficients: Array1D, top_k: int
+) -> Tuple[Array1D, Array1D]:
     """Return the ``top_k`` highest-magnitude coefficients and their indices."""
 
     n = coefficients.size
@@ -188,13 +201,17 @@ def build_sparse_vector(length: int, indices: Array1D, values: Array1D) -> Array
 def compress_fwht_frame(frame_psd: Array1D, config: FWHTConfig) -> FWHTPacket:
     frame_decimated = decimate_frequency_bins(frame_psd, config.decimation_factor_bins)
     frame_standardized, side_info = standardize_frame(frame_decimated)
-    sigma_t = apply_nonlinear_map(frame_standardized, mode=config.nonlinear_mode, alpha=config.nonlinear_alpha)
+    sigma_t = apply_nonlinear_map(
+        frame_standardized, mode=config.nonlinear_mode, alpha=config.nonlinear_alpha
+    )
 
     hadamard_length = next_power_of_two(sigma_t.size)
     sigma_padded = pad_with_zeros(sigma_t, hadamard_length)
     coefficients = fwht_orthonormal(sigma_padded)
 
-    topk_indices, topk_values = select_topk_coefficients(coefficients, config.top_k_coeffs)
+    topk_indices, topk_values = select_topk_coefficients(
+        coefficients, config.top_k_coeffs
+    )
     quantized_values = quantize_uniform(topk_values, config.quant_step)
 
     return FWHTPacket(
@@ -212,12 +229,16 @@ def compress_fwht_frame(frame_psd: Array1D, config: FWHTConfig) -> FWHTPacket:
 
 def decompress_fwht_frame(packet: FWHTPacket) -> Array1D:
     dequantized = dequantize_uniform(packet.quantized_values, packet.quant_step)
-    sparse_coefficients = build_sparse_vector(packet.hadamard_length_bins, packet.topk_indices, dequantized)
+    sparse_coefficients = build_sparse_vector(
+        packet.hadamard_length_bins, packet.topk_indices, dequantized
+    )
 
     sigma_padded = inverse_fwht_orthonormal(sparse_coefficients)
     sigma_t = sigma_padded[: packet.decimated_length_bins]
 
-    frame_standardized = invert_nonlinear_map(sigma_t, mode=packet.nonlinear_mode, alpha=packet.nonlinear_alpha)
+    frame_standardized = invert_nonlinear_map(
+        sigma_t, mode=packet.nonlinear_mode, alpha=packet.nonlinear_alpha
+    )
     frame_decimated = destandardize_frame(frame_standardized, packet.side_info)
     frame_reconstructed = upsample_linear(frame_decimated, packet.original_length_bins)
     return frame_reconstructed.astype(np.float64)
@@ -226,11 +247,17 @@ def decompress_fwht_frame(packet: FWHTPacket) -> Array1D:
 def estimate_payload_bits(packet: FWHTPacket, config: FWHTConfig) -> int:
     index_bits = int(np.ceil(np.log2(max(packet.hadamard_length_bins, 2))))
     side_bits = 2 * int(config.side_info_bits_per_param)
-    coeff_bits = int(packet.topk_indices.size) * (index_bits + int(config.value_bits_per_coeff))
+    coeff_bits = int(packet.topk_indices.size) * (
+        index_bits + int(config.value_bits_per_coeff)
+    )
     return int(side_bits + coeff_bits)
 
 
-def reconstruction_metrics(original_frame: Array1D, reconstructed_frame: Array1D, occupancy_margin_db: float = 3.0) -> dict:
+def reconstruction_metrics(
+    original_frame: Array1D,
+    reconstructed_frame: Array1D,
+    occupancy_margin_db: float = 3.0,
+) -> dict:
     return {
         "mse": mse(original_frame, reconstructed_frame),
         "nmse": nmse(original_frame, reconstructed_frame),

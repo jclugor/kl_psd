@@ -15,7 +15,9 @@ def _load_compare_module():
     """Load the canonical comparison script from the analysis folder."""
 
     repo_root = Path(__file__).resolve().parents[4]
-    module_path = repo_root / "VAE_implementation/scripts/analysis/compare_npy_metrics_plot.py"
+    module_path = (
+        repo_root / "VAE_implementation/scripts/analysis/compare_npy_metrics_plot.py"
+    )
     spec = spec_from_file_location("vae_compare_metrics_plot", module_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Unable to load compare utility from {module_path}")

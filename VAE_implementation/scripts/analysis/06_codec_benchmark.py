@@ -21,14 +21,14 @@ import argparse
 import json
 import time
 from pathlib import Path
-from typing import Optional, Tuple, Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 import yaml
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
+import tensorflow as tf  # type: ignore[import-untyped]
+from tensorflow import keras  # type: ignore[import-untyped]
+from tensorflow.keras import layers  # type: ignore[import-untyped]
 
 import zlib
 import lzma
@@ -58,7 +58,9 @@ def safe_write_json(path: Path, obj) -> None:
 def load_npz(processed_dir: Path) -> np.ndarray:
     npz_path = processed_dir / "dataset_psd_1024_norm.npz"
     if not npz_path.exists():
-        candidates = sorted(processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True)
+        candidates = sorted(
+            processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True
+        )
         if not candidates:
             raise FileNotFoundError(f"No .npz found in {processed_dir}")
         npz_path = candidates[0]
@@ -97,9 +99,13 @@ def build_decoder(latent_dim: int = 32) -> keras.Model:
 
     if _has_conv1d_transpose():
         Conv1DTranspose = layers.Conv1DTranspose
-        x = Conv1DTranspose(32, kernel_size=3, strides=2, padding="same", name="dec_deconv1")(x)
+        x = Conv1DTranspose(
+            32, kernel_size=3, strides=2, padding="same", name="dec_deconv1"
+        )(x)
         x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu1")(x)
-        x = Conv1DTranspose(16, kernel_size=5, strides=2, padding="same", name="dec_deconv2")(x)
+        x = Conv1DTranspose(
+            16, kernel_size=5, strides=2, padding="same", name="dec_deconv2"
+        )(x)
         x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu2")(x)
     else:
         x = layers.UpSampling1D(size=2, name="dec_ups1")(x)
@@ -124,7 +130,9 @@ def load_tflite(tflite_path: Path):
     return interpreter, in_det, out_det
 
 
-def infer_mu_int8_batched(interpreter, in_det, out_det, X_sorted: np.ndarray, batch: int) -> Tuple[np.ndarray, Dict]:
+def infer_mu_int8_batched(
+    interpreter, in_det, out_det, X_sorted: np.ndarray, batch: int
+) -> Tuple[np.ndarray, Dict]:
     """
     X_sorted: (N,1024) float32 in [0,1]
     Returns:
@@ -153,7 +161,7 @@ def infer_mu_int8_batched(interpreter, in_det, out_det, X_sorted: np.ndarray, ba
 
     for s in range(0, N, B):
         n = min(B, N - s)
-        x = X_sorted[s:s+n]  # (n,1024)
+        x = X_sorted[s : s + n]  # (n,1024)
         xb = np.zeros((B, 1024, 1), dtype=np.float32)
         xb[:n, :, 0] = x
 
@@ -190,7 +198,9 @@ def infer_mu_int8_batched(interpreter, in_det, out_det, X_sorted: np.ndarray, ba
 # -----------------------------
 # Packet building / unpacking
 # -----------------------------
-def build_blocks(mu_all: np.ndarray, source_file: np.ndarray, keyframe_every: int) -> Tuple[List[bytes], Dict]:
+def build_blocks(
+    mu_all: np.ndarray, source_file: np.ndarray, keyframe_every: int
+) -> Tuple[List[bytes], Dict]:
     """
     Payload format:
       [L (1 byte)] + mu0 (32 bytes) + deltas ((L-1)*32 bytes, int8 clipped)
@@ -212,7 +222,7 @@ def build_blocks(mu_all: np.ndarray, source_file: np.ndarray, keyframe_every: in
         T = group.shape[0]
 
         for t0 in range(0, T, keyframe_every):
-            seg = group[t0:t0 + keyframe_every]
+            seg = group[t0 : t0 + keyframe_every]
             L = seg.shape[0]
             if L <= 0:
                 continue
@@ -222,9 +232,9 @@ def build_blocks(mu_all: np.ndarray, source_file: np.ndarray, keyframe_every: in
                 blocks.append(bytes([1]) + mu0.tobytes())
                 continue
 
-            d = seg[1:] - seg[:-1]                   # (L-1,32) int16
+            d = seg[1:] - seg[:-1]  # (L-1,32) int16
             d8 = np.clip(d, -128, 127).astype(np.int8)
-            total_delta_frames += (L - 1)
+            total_delta_frames += L - 1
 
             blocks.append(bytes([L]) + mu0.tobytes() + d8.tobytes())
 
@@ -257,7 +267,11 @@ def unpack_blocks(payloads: List[bytes]) -> np.ndarray:
             if len(dbytes) < expected:
                 # truncated block, skip
                 continue
-            d = np.frombuffer(dbytes[:expected], dtype=np.int8).reshape((L - 1, 32)).astype(np.int16)
+            d = (
+                np.frombuffer(dbytes[:expected], dtype=np.int8)
+                .reshape((L - 1, 32))
+                .astype(np.int16)
+            )
 
             prev = mu0
             for i in range(L - 1):
@@ -320,7 +334,9 @@ def decompress_block(b: bytes, codec: str) -> bytes:
     raise ValueError(codec)
 
 
-def bench_codec_roundtrip(blocks: List[bytes], codec: str, level: int) -> Tuple[List[bytes], Dict]:
+def bench_codec_roundtrip(
+    blocks: List[bytes], codec: str, level: int
+) -> Tuple[List[bytes], Dict]:
     """
     Compress and decompress all blocks; returns decompressed blocks and timing stats.
     """
@@ -352,7 +368,9 @@ def main():
     ap.add_argument("--split", choices=["train", "val", "test"], default="train")
     ap.add_argument("--keyframe_every", type=int, default=30)
     ap.add_argument("--batch", type=int, default=64)
-    ap.add_argument("--max_frames", type=int, default=0, help="limit frames after sorting (faster)")
+    ap.add_argument(
+        "--max_frames", type=int, default=0, help="limit frames after sorting (faster)"
+    )
     ap.add_argument("--topk", type=int, default=32)
     args = ap.parse_args()
 
@@ -380,7 +398,9 @@ def main():
 
     tflite_path = out_dir / "encoder_mu_int8.tflite"
     if not tflite_path.exists():
-        raise FileNotFoundError(f"TFLite not found: {tflite_path} (run 04_export_tflite.py first).")
+        raise FileNotFoundError(
+            f"TFLite not found: {tflite_path} (run 04_export_tflite.py first)."
+        )
 
     # Load dataset + metadata
     X = load_npz(processed_dir)
@@ -407,8 +427,8 @@ def main():
     sf = meta_sub["source_file"].to_numpy()
 
     if args.max_frames and args.max_frames > 0:
-        order = order[:args.max_frames]
-        sf = sf[:args.max_frames]
+        order = order[: args.max_frames]
+        sf = sf[: args.max_frames]
 
     # Sorted frames (stream order)
     X_sorted = X_sub[order]  # (N,1024)
@@ -418,7 +438,9 @@ def main():
     # Stage A: ENCODING (TFLite)
     # -----------------------------
     interpreter, in_det, out_det = load_tflite(tflite_path)
-    mu_all, enc_stats = infer_mu_int8_batched(interpreter, in_det, out_det, X_sorted, batch=args.batch)
+    mu_all, enc_stats = infer_mu_int8_batched(
+        interpreter, in_det, out_det, X_sorted, batch=args.batch
+    )
 
     # -----------------------------
     # Stage B: PACKETIZE (delta)
@@ -429,7 +451,7 @@ def main():
     packetize_stats = {
         "packetize_seconds": float(t1 - t0),
         "packetize_ms_per_frame": float(1000.0 * (t1 - t0) / max(1, N)),
-        **blk_stats
+        **blk_stats,
     }
 
     # Raw sizes
@@ -444,31 +466,38 @@ def main():
     # -----------------------------
     codecs = [
         ("none", 0),
-        ("zlib", 1), ("zlib", 6), ("zlib", 9),
-        ("lzma", 1), ("lzma", 6), ("lzma", 9),
-        ("bz2", 1), ("bz2", 9),
+        ("zlib", 1),
+        ("zlib", 6),
+        ("zlib", 9),
+        ("lzma", 1),
+        ("lzma", 6),
+        ("lzma", 9),
+        ("bz2", 1),
+        ("bz2", 9),
     ]
 
     bench = []
     unpack_reference = None
-    unpack_stats_reference = None
 
     for codec, level in codecs:
         decomp_blocks, st = bench_codec_roundtrip(blocks, codec, level)
-        st["compressed_bytes_per_frame"] = float(st["compressed_bytes_total"] / max(1, N))
+        st["compressed_bytes_per_frame"] = float(
+            st["compressed_bytes_total"] / max(1, N)
+        )
 
         # Time unpack (receiver-side) for this codec
         tU0 = time.perf_counter()
         mu_rec = unpack_blocks(decomp_blocks)
         tU1 = time.perf_counter()
         st["unpack_seconds"] = float(tU1 - tU0)
-        st["unpack_ms_per_frame"] = float(1000.0 * (tU1 - tU0) / max(1, mu_rec.shape[0]))
+        st["unpack_ms_per_frame"] = float(
+            1000.0 * (tU1 - tU0) / max(1, mu_rec.shape[0])
+        )
         st["mu_rec_frames"] = int(mu_rec.shape[0])
 
         # Keep reference stream for reconstruction (first codec == none)
         if unpack_reference is None:
             unpack_reference = mu_rec
-            unpack_stats_reference = {"unpack_seconds": st["unpack_seconds"], "mu_rec_frames": st["mu_rec_frames"]}
 
         bench.append(st)
 
@@ -479,7 +508,9 @@ def main():
     if dec_w.exists() and unpack_reference is not None:
         # Dequantize mu_int8 -> float using TFLite output quant params
         out_scale, out_zp = out_det["quantization"]
-        mu_float = (unpack_reference.astype(np.float32) - float(out_zp)) * float(out_scale)  # (N,32)
+        mu_float = (unpack_reference.astype(np.float32) - float(out_zp)) * float(
+            out_scale
+        )  # (N,32)
 
         decoder = build_decoder(latent_dim=32)
         _ = decoder(tf.zeros((1, 32), dtype=tf.float32), training=False)  # build
@@ -490,7 +521,7 @@ def main():
         tR0 = time.perf_counter()
         xhats = []
         for s in range(0, mu_float.shape[0], Bdec):
-            mb = mu_float[s:s+Bdec]
+            mb = mu_float[s : s + Bdec]
             xh = decoder(mb, training=False).numpy()  # (b,1024,1)
             xhats.append(xh)
         X_hat = np.concatenate(xhats, axis=0)
@@ -538,7 +569,9 @@ def main():
             + st["unpack_seconds"]
             + recon_time
         )
-        st["end_to_end_ms_per_frame"] = float(1000.0 * st["end_to_end_seconds"] / max(1, N))
+        st["end_to_end_ms_per_frame"] = float(
+            1000.0 * st["end_to_end_seconds"] / max(1, N)
+        )
 
     report = {
         "tag": tag,
@@ -553,15 +586,15 @@ def main():
             "raw_mu_bytes_per_frame": raw_mu_bytes_per_frame,
             "raw_block_bytes_total": raw_block_bytes_total,
             "raw_block_bytes_per_frame": raw_block_bytes_per_frame,
-            "note": "raw_mu is 32 int8/frame. raw_block is keyframe+delta payload with 1-byte header per block."
+            "note": "raw_mu is 32 int8/frame. raw_block is keyframe+delta payload with 1-byte header per block.",
         },
         "reconstruction": recon_section,
         "benchmarks": bench,
         "notes": [
             "Compression codecs are baselines (zlib/lzma/bz2). For production use ANS/Huffman tailored to symbol stats.",
             "End-to-end time includes encoder inference + packetize + codec + unpack + (optional) decoder reconstruction.",
-            "Timings depend heavily on CPU and batch sizes."
-        ]
+            "Timings depend heavily on CPU and batch sizes.",
+        ],
     }
 
     out_path = out_dir / "codec_report.json"
@@ -578,7 +611,9 @@ def main():
 
     print("[CODEC] Results (bytes/frame, end-to-end ms/frame):")
     for r in bench:
-        print(f"  - {r['codec']:>4} lvl={r['level']:>2} -> {r['compressed_bytes_per_frame']:.3f} B/f | {r['end_to_end_ms_per_frame']:.3f} ms/f")
+        print(
+            f"  - {r['codec']:>4} lvl={r['level']:>2} -> {r['compressed_bytes_per_frame']:.3f} B/f | {r['end_to_end_ms_per_frame']:.3f} ms/f"
+        )
 
 
 if __name__ == "__main__":

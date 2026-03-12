@@ -1,6 +1,49 @@
 """Backward-compatible import surface for measurement API helpers."""
 
-from psd_compression.api import *  # type: ignore[F403]
-from psd_compression.api import __all__ as _PSDCOMPRESSION_API_ALL
+from psd_compression.api import (
+    API_BASE_URL,
+    CAMPAIGNS_DATA_DIR,
+    CSV_FIELDNAMES,
+    CampaignConfigParams,
+    CampaignDownloadResult,
+    CampaignParameters,
+    CampaignScheduleParams,
+    METADATA_FIELDNAMES,
+    MeasurementApiClient,
+    MeasurementApiConfig,
+    MeasurementApiError,
+    MeasurementApiRequestError,
+    NUMERIC_COLUMNS,
+    SENSOR_NETWORK_MAC_BY_LABEL,
+    build_campaign_metadata_row,
+    build_campaign_output_dir,
+    load_measurement_dataframe,
+    load_measurement_frames,
+    resolve_sensor_mac_by_label,
+    save_campaign_metadata_csv,
+    save_measurements_csv,
+)
 
-__all__ = list(_PSDCOMPRESSION_API_ALL)
+__all__ = [
+    "API_BASE_URL",
+    "CAMPAIGNS_DATA_DIR",
+    "CSV_FIELDNAMES",
+    "CampaignConfigParams",
+    "CampaignDownloadResult",
+    "CampaignParameters",
+    "CampaignScheduleParams",
+    "METADATA_FIELDNAMES",
+    "MeasurementApiClient",
+    "MeasurementApiConfig",
+    "MeasurementApiError",
+    "MeasurementApiRequestError",
+    "NUMERIC_COLUMNS",
+    "SENSOR_NETWORK_MAC_BY_LABEL",
+    "build_campaign_metadata_row",
+    "build_campaign_output_dir",
+    "load_measurement_dataframe",
+    "load_measurement_frames",
+    "resolve_sensor_mac_by_label",
+    "save_campaign_metadata_csv",
+    "save_measurements_csv",
+]

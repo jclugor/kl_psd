@@ -24,7 +24,17 @@ import numpy as np
 import zmq
 
 
-DEFAULT_KEYS = ("psd_dbm", "psd", "p_out", "power_dbm", "p_dbm", "spectrum_dbm", "bins_dbm", "pxx", "Pxx")
+DEFAULT_KEYS = (
+    "psd_dbm",
+    "psd",
+    "p_out",
+    "power_dbm",
+    "p_dbm",
+    "spectrum_dbm",
+    "bins_dbm",
+    "pxx",
+    "Pxx",
+)
 
 
 def _to_np1d(x: Any) -> np.ndarray | None:
@@ -50,9 +60,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rf_ipc", default="ipc:///tmp/rf_engine")
     ap.add_argument("--out_ipc", default="ipc:///tmp/ane_psd.ipc")
-    ap.add_argument("--in_key", default=None, help="Preferred key in rf_engine payload (e.g., Pxx).")
+    ap.add_argument(
+        "--in_key", default=None, help="Preferred key in rf_engine payload (e.g., Pxx)."
+    )
     ap.add_argument("--out_key", default="psd_dbm", help="Key emitted to edge bridge.")
-    ap.add_argument("--cmd_json", default=None, help="JSON string command sent to rf_engine.")
+    ap.add_argument(
+        "--cmd_json", default=None, help="JSON string command sent to rf_engine."
+    )
     ap.add_argument("--cmd_file", default=None, help="Path to JSON file with command.")
     ap.add_argument("--send_cmd_every_s", type=float, default=1.0)
     ap.add_argument("--rf_rcv_timeout_ms", type=int, default=1000)
@@ -92,7 +106,11 @@ def main():
 
         while True:
             now = time.perf_counter()
-            if args.send_cmd_every_s > 0 and (now - t_cmd) >= args.send_cmd_every_s and cmd:
+            if (
+                args.send_cmd_every_s > 0
+                and (now - t_cmd) >= args.send_cmd_every_s
+                and cmd
+            ):
                 rf_sock.send_string(json.dumps(cmd))
                 t_cmd = now
 
@@ -116,7 +134,9 @@ def main():
 
             if args.log_every > 0 and (n_fw % args.log_every == 0):
                 dt = max(1e-9, time.perf_counter() - t0)
-                print(f"[CTRL13] rx={n_rx} fw={n_fw} fw_fps={n_fw/dt:.1f} bins={psd.shape[0]}")
+                print(
+                    f"[CTRL13] rx={n_rx} fw={n_fw} fw_fps={n_fw / dt:.1f} bins={psd.shape[0]}"
+                )
 
     except KeyboardInterrupt:
         pass

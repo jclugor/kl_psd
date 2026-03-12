@@ -17,4 +17,3 @@ __all__ = [
     "decompress_fwht_frame",
     "estimate_payload_bits",
 ]
-

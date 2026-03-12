@@ -32,7 +32,7 @@ from pathlib import Path
 
 import numpy as np
 import yaml
-import zlib
+from importlib.machinery import ModuleSpec
 
 
 def repo_root() -> Path:
@@ -45,12 +45,14 @@ def _resolve_tflite_interpreter() -> type:
     """Load the preferred TFLite interpreter class on demand."""
 
     try:
-        from tflite_runtime.interpreter import Interpreter as interpreter_cls
+        from tflite_runtime.interpreter import (  # type: ignore[import-not-found]
+            Interpreter as interpreter_cls,
+        )
 
         return interpreter_cls
     except ModuleNotFoundError:
         try:
-            import tensorflow as tf
+            import tensorflow as tf  # type: ignore[import-untyped]
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
                 "Install `tflite-runtime` or `tensorflow` to run the UDP sender."
@@ -63,8 +65,11 @@ def load_pack_module() -> object:
     root = repo_root()
     mod_path = root / "VAE_implementation" / "scripts" / "codec" / "07_pack_unpack.py"
     spec = importlib.util.spec_from_file_location("packmod", str(mod_path))
+    if spec is None or not isinstance(spec.loader, object):
+        raise ImportError(f"Could not load packet codec module from {mod_path}")
     mod = importlib.util.module_from_spec(spec)
-    assert spec and spec.loader
+    if not isinstance(spec, ModuleSpec) or spec.loader is None:
+        raise ImportError(f"Invalid import spec for packet codec module: {mod_path}")
     spec.loader.exec_module(mod)
     return mod
 
@@ -72,7 +77,9 @@ def load_pack_module() -> object:
 def load_npz(processed_dir: Path) -> dict:
     npz_path = processed_dir / "dataset_psd_1024_norm.npz"
     if not npz_path.exists():
-        candidates = sorted(processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True)
+        candidates = sorted(
+            processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True
+        )
         if not candidates:
             raise FileNotFoundError(f"No .npz found in {processed_dir}")
         npz_path = candidates[0]
@@ -129,12 +136,26 @@ def main():
     ap.add_argument("--source", choices=["dataset", "npy_dir"], default="dataset")
     ap.add_argument("--split", choices=["train", "val", "test"], default="test")
 
-    ap.add_argument("--npy_dir", default=None, help="Folder with PSD .npy files (each is (1024,) float32)")
-    ap.add_argument("--already_normalized", action="store_true", help="If set, sender assumes PSD vectors are already normalized [0,1].")
-    ap.add_argument("--apply_norm_from_npz", action="store_true", help="If set, normalize using gmin/gmax stored in processed npz (global_minmax).")
+    ap.add_argument(
+        "--npy_dir",
+        default=None,
+        help="Folder with PSD .npy files (each is (1024,) float32)",
+    )
+    ap.add_argument(
+        "--already_normalized",
+        action="store_true",
+        help="If set, sender assumes PSD vectors are already normalized [0,1].",
+    )
+    ap.add_argument(
+        "--apply_norm_from_npz",
+        action="store_true",
+        help="If set, normalize using gmin/gmax stored in processed npz (global_minmax).",
+    )
 
     ap.add_argument("--block_len", type=int, default=30)
-    ap.add_argument("--n_blocks", type=int, default=0, help="0 = send as many blocks as possible")
+    ap.add_argument(
+        "--n_blocks", type=int, default=0, help="0 = send as many blocks as possible"
+    )
     ap.add_argument("--zlib_level", type=int, default=1)
     ap.add_argument("--sleep_ms", type=float, default=0.0)
     args = ap.parse_args()
@@ -158,7 +179,9 @@ def main():
 
     tflite_path = model_dir / "encoder_mu_int8.tflite"
     if not tflite_path.exists():
-        raise FileNotFoundError(f"Missing TFLite encoder: {tflite_path} (run 04_export_tflite.py).")
+        raise FileNotFoundError(
+            f"Missing TFLite encoder: {tflite_path} (run 04_export_tflite.py)."
+        )
 
     packmod = load_pack_module()
     interp, in_det, out_det = load_tflite(tflite_path)
@@ -169,11 +192,15 @@ def main():
     if args.apply_norm_from_npz:
         npz = load_npz(processed_dir)
         if "normalize_mode" in npz and str(npz["normalize_mode"]) != "global_minmax":
-            print("[SEND10] WARN: normalize_mode is not global_minmax in npz; apply_norm_from_npz may not match training.")
+            print(
+                "[SEND10] WARN: normalize_mode is not global_minmax in npz; apply_norm_from_npz may not match training."
+            )
         gmin = float(npz.get("gmin", np.nan))
         gmax = float(npz.get("gmax", np.nan))
         if not np.isfinite(gmin + gmax):
-            raise ValueError("apply_norm_from_npz requested but gmin/gmax not found or invalid in npz.")
+            raise ValueError(
+                "apply_norm_from_npz requested but gmin/gmax not found or invalid in npz."
+            )
 
     # Build frame index list depending on source
     L = int(args.block_len)
@@ -188,10 +215,16 @@ def main():
 
         total_blocks = idx.shape[0] // L
         if total_blocks <= 0:
-            raise ValueError(f"Split '{args.split}' does not have enough frames for block_len={L}.")
+            raise ValueError(
+                f"Split '{args.split}' does not have enough frames for block_len={L}."
+            )
 
-        n_blocks = total_blocks if args.n_blocks == 0 else min(int(args.n_blocks), total_blocks)
-        idx = idx[:n_blocks * L]
+        n_blocks = (
+            total_blocks
+            if args.n_blocks == 0
+            else min(int(args.n_blocks), total_blocks)
+        )
+        idx = idx[: n_blocks * L]
 
         def get_psd(i_global: int) -> np.ndarray:
             x = X[int(i_global)]
@@ -210,18 +243,27 @@ def main():
 
         total_frames = len(files)
         total_blocks = total_frames // L
-        n_blocks = total_blocks if args.n_blocks == 0 else min(int(args.n_blocks), total_blocks)
-        files = files[:n_blocks * L]
+        n_blocks = (
+            total_blocks
+            if args.n_blocks == 0
+            else min(int(args.n_blocks), total_blocks)
+        )
+        files = files[: n_blocks * L]
 
         def get_psd(i_global: int) -> np.ndarray:
             x = np.load(files[i_global]).astype(np.float32)
             if x.shape[0] != 1024:
-                raise ValueError(f"PSD file {files[i_global].name} has shape {x.shape}, expected (1024,)")
+                raise ValueError(
+                    f"PSD file {files[i_global].name} has shape {x.shape}, expected (1024,)"
+                )
             if args.already_normalized:
                 return x
             if args.apply_norm_from_npz and gmin is not None:
                 return apply_global_minmax(x, gmin, gmax)
-            raise ValueError("PSD not normalized. Use --already_normalized or --apply_norm_from_npz.")
+            raise ValueError(
+                "PSD not normalized. Use --already_normalized or --apply_norm_from_npz."
+            )
+
         idx = np.arange(len(files), dtype=np.int64)
 
         print(f"[SEND10] source=npy_dir frames={len(files)} blocks={n_blocks} L={L}")
@@ -230,7 +272,9 @@ def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     dest = (args.dest_ip, args.port)
 
-    print(f"[SEND10] -> udp://{args.dest_ip}:{args.port} | {tag} | zlib={args.zlib_level}")
+    print(
+        f"[SEND10] -> udp://{args.dest_ip}:{args.port} | {tag} | zlib={args.zlib_level}"
+    )
 
     seq = 0
     sent_frames = 0
@@ -239,7 +283,6 @@ def main():
 
     for b in range(n_blocks):
         s = b * L
-        e = s + L
 
         mu_block = np.zeros((L, 32), dtype=np.int8)
 
@@ -247,7 +290,9 @@ def main():
             x_norm = get_psd(int(idx[s + i]))
             mu_block[i] = infer_mu_int8_one(interp, in_det, out_det, x_norm)
 
-        pkt = packmod.pack_packet(mu_block, seq=seq, zlib_level=args.zlib_level, keyframe=True)
+        pkt = packmod.pack_packet(
+            mu_block, seq=seq, zlib_level=args.zlib_level, keyframe=True
+        )
         sock.sendto(pkt, dest)
 
         seq += 1
@@ -258,8 +303,10 @@ def main():
             time.sleep(args.sleep_ms / 1000.0)
 
     dt = time.perf_counter() - t0
-    print(f"[SEND10] DONE blocks={seq} frames={sent_frames} bytes={sent_bytes} "
-          f"| frames/s={sent_frames/dt:.1f} | KB/s={sent_bytes/dt/1024:.2f} | avg bytes/frame={sent_bytes/max(1,sent_frames):.3f}")
+    print(
+        f"[SEND10] DONE blocks={seq} frames={sent_frames} bytes={sent_bytes} "
+        f"| frames/s={sent_frames / dt:.1f} | KB/s={sent_bytes / dt / 1024:.2f} | avg bytes/frame={sent_bytes / max(1, sent_frames):.3f}"
+    )
 
 
 if __name__ == "__main__":

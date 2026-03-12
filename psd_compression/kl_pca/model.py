@@ -21,7 +21,9 @@ class KLPCAModel:
     explained_variance_ratio: np.ndarray
 
 
-def fit_kl_pca(frames: np.ndarray, n_components: int = 32, center: bool = True) -> KLPCAModel:
+def fit_kl_pca(
+    frames: np.ndarray, n_components: int = 32, center: bool = True
+) -> KLPCAModel:
     """Fit a KL/PCA basis from a PSD frame matrix."""
 
     x = np.asarray(frames, dtype=np.float64)
@@ -58,7 +60,9 @@ def encode_frame(frame: np.ndarray, model: KLPCAModel) -> np.ndarray:
 
     x = np.asarray(frame, dtype=np.float64).reshape(-1)
     if model.components.ndim != 2 or model.mean.ndim != 1:
-        raise ValueError("model components and mean must be one- and two-dimensional arrays")
+        raise ValueError(
+            "model components and mean must be one- and two-dimensional arrays"
+        )
     if x.shape[0] != model.mean.shape[0]:
         raise ValueError(
             f"frame has {x.shape[0]} bins but model expects {model.mean.shape[0]}"
@@ -66,12 +70,16 @@ def encode_frame(frame: np.ndarray, model: KLPCAModel) -> np.ndarray:
     return (x - model.mean) @ model.components.T
 
 
-def decode_coefficients(coeffs: np.ndarray, model: KLPCAModel, enforce_nonnegative: bool = True) -> np.ndarray:
+def decode_coefficients(
+    coeffs: np.ndarray, model: KLPCAModel, enforce_nonnegative: bool = True
+) -> np.ndarray:
     """Reconstruct one PSD frame from KL/PCA coefficients."""
 
     c = np.asarray(coeffs, dtype=np.float64).reshape(-1)
     if model.components.ndim != 2 or model.mean.ndim != 1:
-        raise ValueError("model components and mean must be one- and two-dimensional arrays")
+        raise ValueError(
+            "model components and mean must be one- and two-dimensional arrays"
+        )
     if c.shape[0] != model.components.shape[0]:
         raise ValueError(
             f"coeffs has length {c.shape[0]} but model expects {model.components.shape[0]}"

@@ -20,12 +20,11 @@ Usage:
 import argparse
 import json
 from pathlib import Path
-from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import yaml
-import tensorflow as tf
+import tensorflow as tf  # type: ignore[import-untyped]
 
 
 # -----------------------------
@@ -51,7 +50,9 @@ def safe_write_json(path: Path, obj) -> None:
 def load_npz(processed_dir: Path) -> np.ndarray:
     npz_path = processed_dir / "dataset_psd_1024_norm.npz"
     if not npz_path.exists():
-        candidates = sorted(processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True)
+        candidates = sorted(
+            processed_dir.glob("*.npz"), key=lambda p: p.stat().st_size, reverse=True
+        )
         if not candidates:
             raise FileNotFoundError(f"No .npz found in {processed_dir}")
         npz_path = candidates[0]
@@ -72,7 +73,9 @@ def load_splits(processed_dir: Path):
 def load_metadata(processed_dir: Path) -> pd.DataFrame:
     meta_path = processed_dir / "metadata.csv"
     if not meta_path.exists():
-        raise FileNotFoundError(f"metadata.csv not found in {processed_dir} (needed for time ordering).")
+        raise FileNotFoundError(
+            f"metadata.csv not found in {processed_dir} (needed for time ordering)."
+        )
     return pd.read_csv(meta_path)
 
 
@@ -96,7 +99,7 @@ def infer_mu_int8(interpreter, in_det, out_det, X_batch: np.ndarray) -> np.ndarr
 
     mus = []
     for i in range(X_batch.shape[0]):
-        x = X_batch[i:i+1, :, None].astype(np.float32)  # (1,1024,1)
+        x = X_batch[i : i + 1, :, None].astype(np.float32)  # (1,1024,1)
         # quantize input
         if in_det["dtype"] == np.int8:
             xq = np.round(x / in_scale + in_zp).astype(np.int8)
@@ -149,8 +152,12 @@ def main():
     ap.add_argument("--run_name", default=None)
     ap.add_argument("--split", choices=["train", "val", "test"], default="test")
     ap.add_argument("--batch", type=int, default=64)
-    ap.add_argument("--keyframe_every", type=int, default=0,
-                    help="If >0, compute delta within blocks separated by keyframes (simulates periodic absolute frames).")
+    ap.add_argument(
+        "--keyframe_every",
+        type=int,
+        default=0,
+        help="If >0, compute delta within blocks separated by keyframes (simulates periodic absolute frames).",
+    )
     args = ap.parse_args()
 
     root = repo_root()
@@ -173,7 +180,9 @@ def main():
 
     tflite_path = out_dir / "encoder_mu_int8.tflite"
     if not tflite_path.exists():
-        raise FileNotFoundError(f"TFLite model not found: {tflite_path}. Run 04_export_tflite.py first.")
+        raise FileNotFoundError(
+            f"TFLite model not found: {tflite_path}. Run 04_export_tflite.py first."
+        )
 
     X = load_npz(processed_dir)
     tr, va, te = load_splits(processed_dir)
@@ -206,11 +215,13 @@ def main():
 
     B = args.batch
     for s in range(0, len(order), B):
-        sl = order[s:s+B]
+        sl = order[s : s + B]
         mu_q = infer_mu_int8(interpreter, in_det, out_det, X_sub[sl])
         mu_all.append(mu_q)
 
-    mu_all = np.concatenate(mu_all, axis=0)  # (N,32) int8, aligned to meta_sub sorted order
+    mu_all = np.concatenate(
+        mu_all, axis=0
+    )  # (N,32) int8, aligned to meta_sub sorted order
 
     # Entropy for raw mu symbols
     counts_mu = hist_int8(mu_all)
@@ -232,7 +243,7 @@ def main():
         if args.keyframe_every and args.keyframe_every > 0:
             k = int(args.keyframe_every)
             for t0 in range(0, block.shape[0], k):
-                seg = block[t0:t0+k]
+                seg = block[t0 : t0 + k]
                 if seg.shape[0] <= 1:
                     continue
                 d = seg[1:] - seg[:-1]
@@ -271,16 +282,28 @@ def main():
         },
         "notes": [
             "Entropy is a lower bound (ideal coder). Real Huffman/ANS will be close but not identical.",
-            "Delta uses int8 clipping; if you store int16 deltas, re-run without clipping and compute a different histogram."
-        ]
+            "Delta uses int8 clipping; if you store int16 deltas, re-run without clipping and compute a different histogram.",
+        ],
     }
 
     out_path = out_dir / "entropy_report.json"
     safe_write_json(out_path, report)
 
     print("[ENTROPY] Saved:", out_path)
-    print("[ENTROPY] H(mu)   =", H_mu, "bits/symbol ->", bytes_per_frame_mu, "bytes/frame (lower bound)")
-    print("[ENTROPY] H(delta)=", H_d,  "bits/symbol ->", bytes_per_frame_delta, "bytes/frame (lower bound)")
+    print(
+        "[ENTROPY] H(mu)   =",
+        H_mu,
+        "bits/symbol ->",
+        bytes_per_frame_mu,
+        "bytes/frame (lower bound)",
+    )
+    print(
+        "[ENTROPY] H(delta)=",
+        H_d,
+        "bits/symbol ->",
+        bytes_per_frame_delta,
+        "bytes/frame (lower bound)",
+    )
     print("[ENTROPY] delta samples:", delta_int8.shape[0])
 
 

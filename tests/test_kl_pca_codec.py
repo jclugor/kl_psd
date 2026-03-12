@@ -18,4 +18,3 @@ def test_kl_pca_roundtrip_synthetic() -> None:
     assert xr.shape == x.shape
     assert np.all(np.isfinite(xr))
     assert float(np.mean((x - xr) ** 2)) < 0.25
-

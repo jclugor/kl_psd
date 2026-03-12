@@ -79,7 +79,9 @@ def encode_mu_block(mu_block: np.ndarray) -> bytes:
     if L <= 0:
         raise ValueError("mu_block must have L>=1")
     if L > 255:
-        raise ValueError("L must be <=255 per packet. Split the stream into smaller blocks.")
+        raise ValueError(
+            "L must be <=255 per packet. Split the stream into smaller blocks."
+        )
 
     mu0 = mu_block[0].astype(np.int8, copy=False)
 
@@ -109,7 +111,9 @@ def decode_mu_block(raw: bytes) -> np.ndarray:
     if len(raw) < expected:
         raise ValueError(f"Truncated block: expected {expected} bytes, got {len(raw)}")
 
-    mu0 = np.frombuffer(raw[1:33], dtype=np.int8).astype(np.int16)  # int16 for cumulative sum
+    mu0 = np.frombuffer(raw[1:33], dtype=np.int8).astype(
+        np.int16
+    )  # int16 for cumulative sum
     out = np.zeros((L, 32), dtype=np.int16)
     out[0] = mu0
 
@@ -125,11 +129,13 @@ def decode_mu_block(raw: bytes) -> np.ndarray:
 # -----------------------------
 # Packet coding (header + zlib payload)
 # -----------------------------
-def pack_packet(mu_block: np.ndarray,
-                seq: int,
-                ts_ms: Optional[int] = None,
-                zlib_level: int = 1,
-                keyframe: bool = True) -> bytes:
+def pack_packet(
+    mu_block: np.ndarray,
+    seq: int,
+    ts_ms: Optional[int] = None,
+    zlib_level: int = 1,
+    keyframe: bool = True,
+) -> bytes:
     """
     Build a packet:
       header + zlib( encode_mu_block(mu_block) )
@@ -150,7 +156,15 @@ def pack_packet(mu_block: np.ndarray,
     flags = FLAG_KEYFRAME if keyframe else 0
     reserved = 0
 
-    header = HDR_STRUCT.pack(MAGIC, VERSION, flags, reserved, int(seq) & 0xFFFFFFFF, int(ts_ms) & 0xFFFFFFFFFFFFFFFF, len(payload))
+    header = HDR_STRUCT.pack(
+        MAGIC,
+        VERSION,
+        flags,
+        reserved,
+        int(seq) & 0xFFFFFFFF,
+        int(ts_ms) & 0xFFFFFFFFFFFFFFFF,
+        len(payload),
+    )
     return header + payload
 
 
@@ -162,7 +176,9 @@ def unpack_packet(pkt: bytes) -> Tuple[PacketHeader, bytes]:
     if len(pkt) < HDR_SIZE:
         raise ValueError("packet too small")
 
-    magic, ver, flags, _reserved, seq, ts_ms, payload_len = HDR_STRUCT.unpack_from(pkt, 0)
+    magic, ver, flags, _reserved, seq, ts_ms, payload_len = HDR_STRUCT.unpack_from(
+        pkt, 0
+    )
     if magic != MAGIC:
         raise ValueError(f"Bad magic: {magic}")
     if ver != VERSION:
@@ -171,8 +187,10 @@ def unpack_packet(pkt: bytes) -> Tuple[PacketHeader, bytes]:
     if len(pkt) < HDR_SIZE + payload_len:
         raise ValueError("Truncated packet payload")
 
-    payload = pkt[HDR_SIZE:HDR_SIZE + payload_len]
-    hdr = PacketHeader(version=ver, flags=flags, seq=seq, ts_ms=ts_ms, payload_len=payload_len)
+    payload = pkt[HDR_SIZE : HDR_SIZE + payload_len]
+    hdr = PacketHeader(
+        version=ver, flags=flags, seq=seq, ts_ms=ts_ms, payload_len=payload_len
+    )
     return hdr, payload
 
 
@@ -203,14 +221,16 @@ def split_into_blocks(mu_stream: np.ndarray, block_len: int) -> list:
 
     blocks = []
     for i in range(0, mu_stream.shape[0], block_len):
-        blocks.append(mu_stream[i:i + block_len].astype(np.int8, copy=False))
+        blocks.append(mu_stream[i : i + block_len].astype(np.int8, copy=False))
     return blocks
 
 
 # -----------------------------
 # Self-test
 # -----------------------------
-def self_test(n_frames: int = 120, block_len: int = 30, zlib_level: int = 1, seed: int = 2026) -> None:
+def self_test(
+    n_frames: int = 120, block_len: int = 30, zlib_level: int = 1, seed: int = 2026
+) -> None:
     rng = np.random.default_rng(seed)
     mu = rng.integers(low=-128, high=128, size=(n_frames, 32), dtype=np.int16)
     mu = mu.astype(np.int8)
@@ -242,16 +262,23 @@ def self_test(n_frames: int = 120, block_len: int = 30, zlib_level: int = 1, see
     mu2 = walk.astype(np.int8)
 
     blocks2 = split_into_blocks(mu2, block_len=block_len)
-    packets2 = [pack_packet(b, seq=i, zlib_level=zlib_level, keyframe=True) for i, b in enumerate(blocks2)]
+    packets2 = [
+        pack_packet(b, seq=i, zlib_level=zlib_level, keyframe=True)
+        for i, b in enumerate(blocks2)
+    ]
     mu2_rec = np.vstack([decode_packet_to_mu(p)[1] for p in packets2])
 
-    print("[SELFTEST] Random-walk mu test: exact equality:", np.array_equal(mu2, mu2_rec))
+    print(
+        "[SELFTEST] Random-walk mu test: exact equality:", np.array_equal(mu2, mu2_rec)
+    )
 
     # Size stats
     raw_bytes = n_frames * 32
     pkt_bytes = sum(len(p) for p in packets2)
     print(f"[SELFTEST] Raw mu bytes total: {raw_bytes}")
-    print(f"[SELFTEST] Packed+zlib bytes total: {pkt_bytes}  -> {pkt_bytes/n_frames:.3f} bytes/frame")
+    print(
+        f"[SELFTEST] Packed+zlib bytes total: {pkt_bytes}  -> {pkt_bytes / n_frames:.3f} bytes/frame"
+    )
 
 
 def main():
@@ -263,10 +290,14 @@ def main():
     args = ap.parse_args()
 
     if args.self_test:
-        self_test(n_frames=args.n_frames, block_len=args.block_len, zlib_level=args.zlib_level)
+        self_test(
+            n_frames=args.n_frames, block_len=args.block_len, zlib_level=args.zlib_level
+        )
     else:
         print("This module is meant to be imported by UDP sender/receiver scripts.")
-        print("Run self-test with: python VAE_implementation/scripts/codec/07_pack_unpack.py --self_test")
+        print(
+            "Run self-test with: python VAE_implementation/scripts/codec/07_pack_unpack.py --self_test"
+        )
 
 
 if __name__ == "__main__":

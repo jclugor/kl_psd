@@ -70,16 +70,16 @@ def build_encoder(
     x = layers.Conv1D(16, kernel_size=5, strides=2, padding="same", name="enc_conv1")(
         x_in
     )
-    x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu1")(x)
+    x = layers.LeakyReLU(negative_slope=0.2, name="enc_lrelu1")(x)
 
     x = layers.Conv1D(32, kernel_size=3, strides=2, padding="same", name="enc_conv2")(x)
-    x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu2")(x)
+    x = layers.LeakyReLU(negative_slope=0.2, name="enc_lrelu2")(x)
 
     x = layers.Flatten(name="enc_flatten")(x)
 
     if include_dense128:
         x = layers.Dense(128, name="enc_dense")(x)
-        x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu_dense")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="enc_lrelu_dense")(x)
 
     mu = layers.Dense(latent_dim, name="z_mu")(x)
     logvar = layers.Dense(latent_dim, name="z_logvar")(x)

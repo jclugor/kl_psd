@@ -74,16 +74,16 @@ def build_encoder(
     x = layers.Conv1D(16, kernel_size=5, strides=2, padding="same", name="enc_conv1")(
         x_in
     )
-    x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu1")(x)
+    x = layers.LeakyReLU(negative_slope=0.2, name="enc_lrelu1")(x)
 
     x = layers.Conv1D(32, kernel_size=3, strides=2, padding="same", name="enc_conv2")(x)
-    x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu2")(x)
+    x = layers.LeakyReLU(negative_slope=0.2, name="enc_lrelu2")(x)
 
     x = layers.Flatten(name="enc_flatten")(x)
 
     if include_dense128:
         x = layers.Dense(128, name="enc_dense")(x)
-        x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu_dense")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="enc_lrelu_dense")(x)
 
     mu = layers.Dense(latent_dim, name="z_mu")(x)
     logvar = layers.Dense(latent_dim, name="z_logvar")(x)
@@ -102,20 +102,20 @@ def build_decoder(input_bins: int = 1024, latent_dim: int = 32) -> keras.Model:
         x = Conv1DTranspose(
             32, kernel_size=3, strides=2, padding="same", name="dec_deconv1"
         )(x)
-        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu1")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="dec_lrelu1")(x)
 
         x = Conv1DTranspose(
             16, kernel_size=5, strides=2, padding="same", name="dec_deconv2"
         )(x)
-        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu2")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="dec_lrelu2")(x)
     else:
         x = layers.UpSampling1D(size=2, name="dec_ups1")(x)
         x = layers.Conv1D(32, kernel_size=3, padding="same", name="dec_conv1")(x)
-        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu1")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="dec_lrelu1")(x)
 
         x = layers.UpSampling1D(size=2, name="dec_ups2")(x)
         x = layers.Conv1D(16, kernel_size=5, padding="same", name="dec_conv2")(x)
-        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu2")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="dec_lrelu2")(x)
 
     x_hat = layers.Conv1D(1, kernel_size=1, activation="sigmoid", name="x_hat")(x)
     return keras.Model(z_in, x_hat, name="decoder")

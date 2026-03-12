@@ -1,0 +1,33 @@
+{
+  "tag": "RUN:tf_smoke:best",
+  "weights": {
+    "encoder": "/home/marti/Code/kl_psd/VAE_implementation/models/runs/tf_smoke/enc_best.weights.h5",
+    "decoder": "/home/marti/Code/kl_psd/VAE_implementation/models/runs/tf_smoke/dec_best.weights.h5"
+  },
+  "data": {
+    "processed_dir": "/home/marti/Code/kl_psd/data/processed/psd_1024",
+    "npz": "/home/marti/Code/kl_psd/data/processed/psd_1024/dataset_psd_1024_norm.npz",
+    "X_test_shape": [
+      96,
+      1024,
+      1
+    ],
+    "normalize_meta": {
+      "npz_path": "/home/marti/Code/kl_psd/data/processed/psd_1024/dataset_psd_1024_norm.npz",
+      "gmin": -31.256715774536133,
+      "gmax": 5.902835845947266,
+      "normalize_mode": "global_minmax"
+    }
+  },
+  "losses": {
+    "beta_used_for_reporting": 1.0,
+    "recon_loss": 44.00974655151367,
+    "kl_loss": 0.44342342019081116,
+    "total_loss": 44.45316997170448
+  },
+  "peak_metrics": {
+    "topk": 16,
+    "topk_peak_mse": 0.07206135243177414,
+    "peak_bias_mean_recon_minus_orig": -0.372989296913147
+  }
+}

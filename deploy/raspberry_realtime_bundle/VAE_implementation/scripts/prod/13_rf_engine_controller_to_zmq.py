@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""
-13_rf_engine_controller_to_zmq.py - Controller puente para rf_engine -> IPC PSD.
+"""Bridge ``rf_engine`` output into the repository IPC PSD stream.
 
-Uso principal:
-- No modificar SDR-SpectrumMonitoring-Sensor.
-- Levantar rf_engine standalone (sin orchestrator).
-- Este script hace de peer ZMQ PAIR del rf_engine, envia comando(s) y re-publica la PSD
-  al IPC consumido por 11_edge_hackrf_psd_zmq_to_udp.py.
+Primary use case:
+- keep ``SDR-SpectrumMonitoring-Sensor`` unchanged,
+- run ``rf_engine`` in standalone mode without its orchestrator,
+- act as the ZMQ ``PAIR`` peer for ``rf_engine``, send control command(s), and
+  republish the resulting PSD frames to the IPC endpoint consumed by
+  ``11_edge_hackrf_psd_zmq_to_udp.py``.
 
-Topologia:
+Topology:
   rf_engine (connect PAIR -> ipc:///tmp/rf_engine)
         <-> this controller (bind ipc:///tmp/rf_engine)
   this controller (connect ipc:///tmp/ane_psd.ipc)
@@ -38,6 +38,8 @@ DEFAULT_KEYS = (
 
 
 def _to_np1d(x: Any) -> np.ndarray | None:
+    """Convert one PSD-like payload into a flat ``float32`` NumPy array."""
+
     try:
         arr = np.asarray(x, dtype=np.float32).reshape(-1)
         if arr.size == 0:
@@ -48,6 +50,8 @@ def _to_np1d(x: Any) -> np.ndarray | None:
 
 
 def pick_psd(obj: dict, preferred_key: str | None) -> np.ndarray | None:
+    """Extract the PSD vector from one decoded payload mapping."""
+
     if preferred_key and preferred_key in obj:
         return _to_np1d(obj[preferred_key])
     for k in DEFAULT_KEYS:
@@ -57,6 +61,8 @@ def pick_psd(obj: dict, preferred_key: str | None) -> np.ndarray | None:
 
 
 def main():
+    """Parse CLI arguments and relay ``rf_engine`` PSD messages to the edge IPC."""
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--rf_ipc", default="ipc:///tmp/rf_engine")
     ap.add_argument("--out_ipc", default="ipc:///tmp/ane_psd.ipc")

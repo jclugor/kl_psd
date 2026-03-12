@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+import importlib.util
 import json
 import math
 import shutil
@@ -63,6 +64,22 @@ def safe_write_json(path: Path, obj) -> None:
     path.write_text(json.dumps(obj, indent=2))
 
 
+def make_tensorboard_callback(logs_dir: Path) -> keras.callbacks.Callback | None:
+    """Return a TensorBoard callback when the optional package is installed.
+
+    TensorFlow 2.21 on Python 3.13 does not currently install ``tensorboard`` as a
+    hard dependency in this environment. Training should still proceed, so the
+    callback becomes an optional integration point instead of a mandatory
+    runtime dependency.
+    """
+
+    if importlib.util.find_spec("tensorboard") is None:
+        print("[TRAIN] TensorBoard package not installed -> skipping TensorBoard logs.")
+        return None
+
+    return keras.callbacks.TensorBoard(log_dir=str(logs_dir))
+
+
 # =============================
 # Architecture (must match eval)
 # =============================
@@ -88,16 +105,16 @@ def build_encoder(
     x = layers.Conv1D(16, kernel_size=5, strides=2, padding="same", name="enc_conv1")(
         x_in
     )
-    x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu1")(x)
+    x = layers.LeakyReLU(negative_slope=0.2, name="enc_lrelu1")(x)
 
     x = layers.Conv1D(32, kernel_size=3, strides=2, padding="same", name="enc_conv2")(x)
-    x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu2")(x)
+    x = layers.LeakyReLU(negative_slope=0.2, name="enc_lrelu2")(x)
 
     x = layers.Flatten(name="enc_flatten")(x)
 
     if include_dense128:
         x = layers.Dense(128, name="enc_dense")(x)
-        x = layers.LeakyReLU(alpha=0.2, name="enc_lrelu_dense")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="enc_lrelu_dense")(x)
 
     mu = layers.Dense(latent_dim, name="z_mu")(x)
     logvar = layers.Dense(latent_dim, name="z_logvar")(x)
@@ -124,20 +141,20 @@ def build_decoder(input_bins: int = 1024, latent_dim: int = 32) -> keras.Model:
         x = Conv1DTranspose(
             32, kernel_size=3, strides=2, padding="same", name="dec_deconv1"
         )(x)
-        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu1")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="dec_lrelu1")(x)
 
         x = Conv1DTranspose(
             16, kernel_size=5, strides=2, padding="same", name="dec_deconv2"
         )(x)
-        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu2")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="dec_lrelu2")(x)
     else:
         x = layers.UpSampling1D(size=2, name="dec_ups1")(x)
         x = layers.Conv1D(32, kernel_size=3, padding="same", name="dec_conv1")(x)
-        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu1")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="dec_lrelu1")(x)
 
         x = layers.UpSampling1D(size=2, name="dec_ups2")(x)
         x = layers.Conv1D(16, kernel_size=5, padding="same", name="dec_conv2")(x)
-        x = layers.LeakyReLU(alpha=0.2, name="dec_lrelu2")(x)
+        x = layers.LeakyReLU(negative_slope=0.2, name="dec_lrelu2")(x)
 
     x_hat = layers.Conv1D(1, kernel_size=1, activation="sigmoid", name="x_hat")(x)
     return keras.Model(z_in, x_hat, name="decoder")
@@ -189,6 +206,15 @@ class VAE(keras.Model):
     @property
     def metrics(self):
         return [self.total_loss_tracker, self.recon_loss_tracker, self.kl_loss_tracker]
+
+    def build(self, input_shape) -> None:
+        """Build the VAE and its submodels for the provided input shape."""
+
+        shape = tf.TensorShape(input_shape)
+        self.encoder.build(shape)
+        latent_shape = tf.TensorShape((shape[0], self.encoder.output_shape[0][-1]))
+        self.decoder.build(latent_shape)
+        super().build(input_shape)
 
     def call(self, x, training=False):
         mu, logvar = self.encoder(x, training=training)
@@ -585,7 +611,7 @@ def main():
 
     print("[TRAIN] initial_epoch =", initial_epoch, "| epochs =", epochs)
 
-    callbacks = [
+    callbacks: list[keras.callbacks.Callback] = [
         BetaWarmUp(beta_final=beta_final, warmup_epochs=beta_warmup_epochs),
         SaveEncDec(
             enc_latest=enc_latest,
@@ -595,7 +621,6 @@ def main():
             epoch_file=epoch_file,
             best_file=best_file,
         ),
-        keras.callbacks.TensorBoard(log_dir=str(logs_dir)),
         keras.callbacks.CSVLogger(str(run_dir / "history.csv"), append=True),
         keras.callbacks.TerminateOnNaN(),
         # FIX: add mode="min" so Keras knows how to compare
@@ -608,6 +633,12 @@ def main():
             verbose=1,
         ),
     ]
+
+    # Keep TensorBoard logging available when the optional package exists,
+    # but avoid aborting the full training run when it is absent.
+    tensorboard_callback = make_tensorboard_callback(logs_dir)
+    if tensorboard_callback is not None:
+        callbacks.insert(2, tensorboard_callback)
 
     fit_kwargs = dict(
         x=bundle.ds_train,

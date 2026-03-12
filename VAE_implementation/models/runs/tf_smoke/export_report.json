@@ -1,0 +1,15 @@
+{
+  "tag": "RUN:tf_smoke:best",
+  "processed_dir": "/home/marti/Code/kl_psd/data/processed/psd_1024",
+  "encoder_weights": "/home/marti/Code/kl_psd/VAE_implementation/models/runs/tf_smoke/enc_best.weights.h5",
+  "export_dir": "/home/marti/Code/kl_psd/VAE_implementation/models/runs/tf_smoke",
+  "keras_encoder_mu": "/home/marti/Code/kl_psd/VAE_implementation/models/runs/tf_smoke/encoder_mu.keras",
+  "tflite_encoder_mu_int8": "/home/marti/Code/kl_psd/VAE_implementation/models/runs/tf_smoke/encoder_mu_int8.tflite",
+  "ptq": {
+    "n_rep": 16,
+    "n_val": 8,
+    "mu_mae": 0.0011012796312570572,
+    "mu_rmse": 0.001368770026601851,
+    "mu_max_abs": 0.0037957150489091873
+  }
+}

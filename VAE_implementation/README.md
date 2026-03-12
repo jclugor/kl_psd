@@ -1,12 +1,12 @@
 # VAE_implementation
 
-Guia rapida del pipeline VAE PSD (version estable).
+Quick reference for the stable VAE PSD pipeline.
 
-Documentacion completa:
-- `VAE_implementation/DOCUMENTACION_TECNICA.md`
-- `VAE_implementation/IMPLEMENTACION_REAL.md`
+Full documentation:
+- `VAE_implementation/TECHNICAL_DOCUMENTATION.md`
+- `VAE_implementation/REAL_DEPLOYMENT.md`
 
-## Requerimientos
+## Requirements
 
 ```powershell
 python -m venv .venv
@@ -15,24 +15,24 @@ pip install -r requirements.txt
 pip install pyzmq
 ```
 
-Notas:
-- En Raspberry: ideal `tflite-runtime`; fallback `tensorflow`.
-- En Windows/TensorFlow usar `tf.lite.Interpreter`.
+Notes:
+- On Raspberry Pi, `tflite-runtime` is preferred; `tensorflow` is the fallback.
+- On Windows with TensorFlow, use `tf.lite.Interpreter`.
 
-## Estructura de scripts
+## Script layout
 
-- `VAE_implementation/scripts/training/` entrenamiento y export
-- `VAE_implementation/scripts/analysis/` analisis y benchmarks
-- `VAE_implementation/scripts/codec/` protocolo y pack/unpack
-- `VAE_implementation/scripts/prod/` produccion (edge/servidor)
+- `VAE_implementation/scripts/training/` training and export
+- `VAE_implementation/scripts/analysis/` analysis and benchmarks
+- `VAE_implementation/scripts/codec/` protocol and pack/unpack helpers
+- `VAE_implementation/scripts/prod/` production edge/server workflows
 
-## Estructura de datos
+## Data layout
 
-- `data/raw/` datos crudos (adquisicion externa)
-- `data/processed/` datasets procesados + splits
-- `data/external/` drop area opcional para datasets externos
+- `data/raw/` raw acquisitions from external pipelines
+- `data/processed/` processed datasets plus split indices
+- `data/external/` optional drop area for external datasets
 
-## Pipeline base
+## Base pipeline
 
 ```powershell
 .\VAE_implementation\scripts\training\00_get_data.ps1
@@ -42,45 +42,48 @@ python VAE_implementation/scripts/training/03_eval.py --config VAE_implementatio
 python VAE_implementation/scripts/training/04_export_tflite.py --config VAE_implementation/configs/vae_default.yaml --use_global_best
 ```
 
-## Adquisicion de dataset (externa)
+## External dataset acquisition
 
-La adquisicion de dataset se realiza fuera de este repositorio. Este repo asume que ya existe
-un pipeline externo que produce PSD en tiempo real o por lotes.
+Dataset acquisition happens outside this repository. This project assumes an
+external pipeline already produces PSD data in real time or in batch mode.
 
-Si `data/raw/DataBase-RF-FM-88MHz-108MHz-Bogota-Funza` no esta disponible, el
-preprocess usa primero el dataset procesado existente y, si ese dataset no
-existe, puede caer al export de campana en `data/campaigns/MeasurementCalibration`
-para smoke tests locales.
+If `data/raw/DataBase-RF-FM-88MHz-108MHz-Bogota-Funza` is unavailable, the
+preprocess step first reuses the existing processed dataset and, if that
+dataset is also missing, can fall back to the campaign export in
+`data/campaigns/MeasurementCalibration` for local smoke tests.
 
-## Test local 
+## Local test
 
 Receiver:
+
 ```powershell
 python VAE_implementation/scripts/prod/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --save_every_packets 1 --idle_stop_s 3 --invert_norm_to_original
 ```
 
 Sender:
+
 ```powershell
 python VAE_implementation/scripts/prod/10_udp_sender_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --dest_ip 127.0.0.1 --port 5005 --source dataset --split test --block_len 30 --n_blocks 3 --zlib_level 1
 ```
 
-## Produccion SDR
+## SDR production
 
-Bridge edge (estable):
+Stable edge bridge:
+
 ```bash
 python VAE_implementation/scripts/prod/11_edge_hackrf_psd_zmq_to_udp.py \
   --config VAE_implementation/configs/vae_default.yaml \
   --use_global_best \
   --ipc "ipc:///tmp/ane_psd.ipc" \
-  --dest_ip <IP_SERVIDOR> --port 5005 \
+  --dest_ip <SERVER_IP> --port 5005 \
   --block_len 30 --zlib_level 1
 ```
 
-## Integracion con un pipeline externo
+## External pipeline integration
 
-Este repo consume PSD via ZMQ/JSON. El productor de PSD debe publicar a:
-`ipc:///tmp/ane_psd.ipc` con una llave compatible (por ejemplo `psd_dbm`).
+This repository consumes PSD frames through ZMQ/JSON. The PSD producer must
+publish to `ipc:///tmp/ane_psd.ipc` using a compatible key such as `psd_dbm`.
 
-Opciones de integracion:
-- `12_acq_sensor_to_zmq.py` si necesitas adaptar otro repo o un proceso que emite PSD.
-- `13_rf_engine_controller_to_zmq.py` si usas `rf_engine` y no puedes modificar su orchestrator.
+Integration options:
+- `12_acq_sensor_to_zmq.py` if you need to adapt another repository or process that emits PSD frames
+- `13_rf_engine_controller_to_zmq.py` if you use `rf_engine` and cannot modify its orchestrator

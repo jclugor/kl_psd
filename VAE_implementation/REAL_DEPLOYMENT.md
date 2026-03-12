@@ -1,81 +1,86 @@
-# IMPLEMENTACION_REAL.md
+# REAL_DEPLOYMENT.md
 
-Guia operativa para despliegue real.
+Operational guide for real deployment.
 
-## 1. Objetivo
+## 1. Goal
 
-1. Edge recibe PSD del pipeline SDR.
-2. Edge codifica latente y envia UDP.
-3. Servidor reconstruye PSD y guarda metricas/plots.
+1. The edge device receives PSD frames from the SDR pipeline.
+2. The edge device encodes the latent representation and sends UDP packets.
+3. The server reconstructs the PSD frames and stores metrics and plots.
 
-## 2. Scripts principales
+## 2. Main scripts
 
 - `VAE_implementation/scripts/prod/10_udp_sender_prod.py`
 - `VAE_implementation/scripts/prod/10_udp_receiver_prod.py`
 - `VAE_implementation/scripts/prod/11_edge_hackrf_psd_zmq_to_udp.py`
-- `VAE_implementation/scripts/prod/12_acq_sensor_to_zmq.py` (adaptador para repo externo)
-- `VAE_implementation/scripts/prod/13_rf_engine_controller_to_zmq.py` (controller propio para rf_engine)
+- `VAE_implementation/scripts/prod/12_acq_sensor_to_zmq.py` as an adapter for an external repository
+- `VAE_implementation/scripts/prod/13_rf_engine_controller_to_zmq.py` as a custom controller for `rf_engine`
 
-## 3. Prerrequisitos
+## 3. Prerequisites
 
 ```powershell
 pip install -r requirements.txt
 pip install pyzmq
 ```
 
-Artefactos minimos en `VAE_implementation/models/GLOBAL_BEST/`:
+Minimum artifacts in `VAE_implementation/models/GLOBAL_BEST/`:
 - `encoder_mu_int8.tflite`
 - `dec_best.weights.h5`
 
-## 4. Test local rapido
+## 4. Quick local test
 
 Terminal A (receiver):
+
 ```powershell
 python VAE_implementation/scripts/prod/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --save_every_packets 1 --idle_stop_s 3 --invert_norm_to_original --compare_split test --plot_every_packets 1
 ```
 
 Terminal B (sender):
+
 ```powershell
 python VAE_implementation/scripts/prod/10_udp_sender_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --dest_ip 127.0.0.1 --port 5005 --source dataset --split test --block_len 30 --n_blocks 10 --zlib_level 1
 ```
 
-Salida:
+Output directory:
 - `VAE_implementation/models/GLOBAL_BEST/udp_prod/`
 
-## 5. Despliegue real con SDR
+## 5. Real deployment with SDR
 
-Servidor:
+Server:
+
 ```powershell
 python VAE_implementation/scripts/prod/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 0.0.0.0 --port 5005 --save_every_packets 10 --idle_stop_s 10 --invert_norm_to_original
 ```
 
 Edge bridge:
+
 ```bash
 python VAE_implementation/scripts/prod/11_edge_hackrf_psd_zmq_to_udp.py \
   --config VAE_implementation/configs/vae_default.yaml \
   --use_global_best \
   --ipc "ipc:///tmp/ane_psd.ipc" \
-  --dest_ip <IP_SERVIDOR> --port 5005 \
+  --dest_ip <SERVER_IP> --port 5005 \
   --block_len 30 --zlib_level 1
 ```
 
-## 6. Adquisicion externa
+## 6. External acquisition
 
-La adquisicion de PSD se realiza fuera de este repositorio. El pipeline externo debe
-publicar PSD en ZMQ/JSON al IPC `ipc:///tmp/ane_psd.ipc` para que el bridge pueda consumirlo.
+PSD acquisition is external to this repository. The external pipeline must
+publish PSD frames over ZMQ/JSON to `ipc:///tmp/ane_psd.ipc` so the bridge can
+consume them.
 
-### 6.1 Adaptador por callable/script
+### 6.1 Callable/script adapter
 
 ```bash
 python VAE_implementation/scripts/prod/12_acq_sensor_to_zmq.py \
   --mode callable \
   --sensor_repo_path /home/pi/SDR-SpectrumMonitoring-Sensor \
-  --callable "mi_modulo.mi_fuente:get_next_psd" \
+  --callable "my_module.my_source:get_next_psd" \
   --ipc "ipc:///tmp/ane_psd.ipc" \
   --out_key psd_dbm
 ```
 
-### 6.2 Controller propio para rf_engine
+### 6.2 Custom controller for `rf_engine`
 
 ```bash
 python VAE_implementation/scripts/prod/13_rf_engine_controller_to_zmq.py \
@@ -86,32 +91,34 @@ python VAE_implementation/scripts/prod/13_rf_engine_controller_to_zmq.py \
   --send_cmd_every_s 1.0
 ```
 
-## 7. Formato de PSD por ZMQ
+## 7. ZMQ PSD format
 
-JSON ejemplo:
+Example JSON:
+
 ```json
 {"psd_dbm": [-91.2, -90.8, -89.7]}
 ```
 
-Llaves auto-detectadas:
+Auto-detected keys:
 - `psd_dbm`, `psd`, `p_out`, `power_dbm`, `p_dbm`, `spectrum_dbm`, `bins_dbm`, `pxx`
 
-Si usa otra llave:
+If you use a different key:
+
 ```bash
---psd_key <llave>
+--psd_key <key>
 ```
 
-## 8. Validacion
+## 8. Validation
 
-Revisar:
+Check:
 - `udp_prod_metrics.json`
 - `waterfall_recon.png`
-- `waterfall_orig.png` (si compare mode)
-- `recon_last_psd.npy` y `orig_last_psd.npy` (si compare mode)
+- `waterfall_orig.png` in compare mode
+- `recon_last_psd.npy` and `orig_last_psd.npy` in compare mode
 
-## 10. Troubleshooting
+## 9. Troubleshooting
 
-- `Missing encoder_mu_int8.tflite`: ejecutar `04_export_tflite.py`.
-- `ImportError tensorflow.lite.Interpreter`: actualizar entorno o usar `tflite-runtime`.
-- No llegan paquetes: revisar IP, puerto y firewall.
-- Bridge sin PSD: verificar endpoint ZMQ y `--psd_key`.
+- `Missing encoder_mu_int8.tflite`: run `04_export_tflite.py`
+- `ImportError tensorflow.lite.Interpreter`: update the environment or use `tflite-runtime`
+- Packets do not arrive: check the IP, port, and firewall
+- Bridge without PSD frames: verify the ZMQ endpoint and `--psd_key`

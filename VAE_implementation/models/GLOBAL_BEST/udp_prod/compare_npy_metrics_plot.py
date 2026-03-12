@@ -33,9 +33,11 @@ def main() -> None:
     compare_module = _load_compare_module()
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--orig", default=None, help="Path a orig .npy")
-    ap.add_argument("--recon", default=None, help="Path a recon .npy")
-    ap.add_argument("--out_dir", default=None, help="Directorio de salida")
+    ap.add_argument("--orig", default=None, help="Path to the original .npy file")
+    ap.add_argument("--recon", default=None, help="Path to the reconstructed .npy file")
+    ap.add_argument(
+        "--out_dir", default=None, help="Output directory for metrics and plots"
+    )
     args = ap.parse_args()
 
     script_dir = Path(__file__).resolve().parent
@@ -45,9 +47,9 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if not orig_path.exists():
-        raise FileNotFoundError(f"orig npy no encontrado: {orig_path}")
+        raise FileNotFoundError(f"Original .npy file not found: {orig_path}")
     if not recon_path.exists():
-        raise FileNotFoundError(f"recon npy no encontrado: {recon_path}")
+        raise FileNotFoundError(f"Reconstructed .npy file not found: {recon_path}")
 
     orig = np.load(orig_path).astype(np.float64).reshape(-1)
     recon = np.load(recon_path).astype(np.float64).reshape(-1)

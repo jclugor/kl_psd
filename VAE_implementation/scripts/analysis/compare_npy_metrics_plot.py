@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Compare saved PSD reconstructions and materialize plots plus summary metrics.
 
-Uso (desde raiz del repo):
+Usage (from the repository root):
   python VAE_implementation/scripts/analysis/compare_npy_metrics_plot.py
 
-Opcional:
+Optional:
   python .../compare_npy_metrics_plot.py --orig path/orig.npy --recon path/recon.npy
 """
 
@@ -65,9 +65,9 @@ def save_plots(orig: np.ndarray, recon: np.ndarray, out_dir: Path) -> None:
     plt.figure(figsize=(12, 4))
     plt.plot(x, orig, label="orig", linewidth=1.5)
     plt.plot(x, recon, label="recon", linewidth=1.2, alpha=0.9)
-    plt.title("PSD: Original vs Reconstruccion")
+    plt.title("PSD: Original vs Reconstruction")
     plt.xlabel("Bin")
-    plt.ylabel("Valor")
+    plt.ylabel("Value")
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
@@ -77,7 +77,7 @@ def save_plots(orig: np.ndarray, recon: np.ndarray, out_dir: Path) -> None:
     plt.figure(figsize=(12, 3))
     plt.plot(x, err, label="error (recon-orig)", color="tab:red", linewidth=1.0)
     plt.axhline(0.0, color="black", linewidth=0.8)
-    plt.title("Error por Bin")
+    plt.title("Error by Bin")
     plt.xlabel("Bin")
     plt.ylabel("Error")
     plt.grid(True, alpha=0.3)
@@ -88,9 +88,9 @@ def save_plots(orig: np.ndarray, recon: np.ndarray, out_dir: Path) -> None:
 
     plt.figure(figsize=(6, 4))
     plt.hist(err, bins=40, color="tab:blue", alpha=0.85)
-    plt.title("Histograma del Error")
+    plt.title("Error Histogram")
     plt.xlabel("Error")
-    plt.ylabel("Frecuencia")
+    plt.ylabel("Frequency")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(out_dir / "compare_error_hist.png", dpi=180)
@@ -101,9 +101,11 @@ def main() -> None:
     """Parse CLI arguments, compare the PSD vectors, and write artifacts."""
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--orig", default=None, help="Path a orig .npy")
-    ap.add_argument("--recon", default=None, help="Path a recon .npy")
-    ap.add_argument("--out_dir", default=None, help="Directorio de salida")
+    ap.add_argument("--orig", default=None, help="Path to the original .npy file")
+    ap.add_argument("--recon", default=None, help="Path to the reconstructed .npy file")
+    ap.add_argument(
+        "--out_dir", default=None, help="Output directory for metrics and plots"
+    )
     args = ap.parse_args()
 
     script_dir = Path(__file__).resolve().parent
@@ -113,9 +115,9 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if not orig_path.exists():
-        raise FileNotFoundError(f"orig npy no encontrado: {orig_path}")
+        raise FileNotFoundError(f"Original .npy file not found: {orig_path}")
     if not recon_path.exists():
-        raise FileNotFoundError(f"recon npy no encontrado: {recon_path}")
+        raise FileNotFoundError(f"Reconstructed .npy file not found: {recon_path}")
 
     # Compare both arrays over the common support to avoid shape-related crashes.
     orig = np.load(orig_path).astype(np.float64).reshape(-1)

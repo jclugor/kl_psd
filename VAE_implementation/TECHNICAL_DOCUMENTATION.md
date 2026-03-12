@@ -1,56 +1,63 @@
 # VAE_implementation
 
-Documentacion tecnica de la implementacion VAE PSD (version estable).
+Technical documentation for the stable VAE PSD implementation.
 
-## 1. Objetivo
+## 1. Goal
 
-Comprimir y transportar PSD (1024 bins) por UDP minimizando ancho de banda y manteniendo reconstruccion usable.
+Compress and transport PSD frames (1024 bins) over UDP while minimizing
+bandwidth and keeping the reconstruction useful.
 
-## 2. Arquitectura
+## 2. Architecture
 
-- Encoder TFLite INT8 en edge.
-- Decoder Keras en servidor.
-- Protocolo UDP binario (`KLP1`) definido en `scripts/codec/07_pack_unpack.py`.
-- Flujo temporal: cada bloque transmite `mu_int8` (mu0+deltas).
+- INT8 TFLite encoder on the edge device
+- Keras decoder on the server
+- Binary UDP protocol (`KLP1`) defined in `scripts/codec/07_pack_unpack.py`
+- Temporal stream format in which each block transmits `mu_int8` as `mu0 + deltas`
 
-## 3. Scripts clave
+## 3. Key scripts
 
-Base:
-- `scripts/training/01_preprocess.py`, `scripts/training/02_train.py`, `scripts/training/03_eval.py`, `scripts/training/04_export_tflite.py`
+Base workflow:
+- `scripts/training/01_preprocess.py`
+- `scripts/training/02_train.py`
+- `scripts/training/03_eval.py`
+- `scripts/training/04_export_tflite.py`
 - `scripts/codec/07_pack_unpack.py`
 
-Produccion:
+Production workflow:
 - `scripts/prod/10_udp_sender_prod.py`
 - `scripts/prod/10_udp_receiver_prod.py`
 - `scripts/prod/11_edge_hackrf_psd_zmq_to_udp.py`
-- `scripts/prod/12_acq_sensor_to_zmq.py` (adaptador de adquisicion externa)
-- `scripts/prod/13_rf_engine_controller_to_zmq.py` (controller propio para rf_engine)
+- `scripts/prod/12_acq_sensor_to_zmq.py` for external-acquisition adaptation
+- `scripts/prod/13_rf_engine_controller_to_zmq.py` as a custom controller for `rf_engine`
 
-## 4. Dependencias
+## 4. Dependencies
 
 - `numpy`, `tensorflow/keras`, `pyyaml`, `matplotlib`
-- `pyzmq` (bridge SDR)
-- `tflite-runtime` opcional en edge
+- `pyzmq` for the SDR bridge
+- optional `tflite-runtime` on the edge device
 
-## 5. Flujo de ejecucion
+## 5. Execution flow
 
-1. Exportar TFLite:
+1. Export TFLite artifacts:
+
 ```powershell
 python VAE_implementation/scripts/training/04_export_tflite.py --config VAE_implementation/configs/vae_default.yaml --use_global_best
 ```
 
-2. Test local:
+2. Run a local test:
+
 ```powershell
 python VAE_implementation/scripts/prod/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --save_every_packets 1 --idle_stop_s 3 --invert_norm_to_original --compare_split test --plot_every_packets 1
 python VAE_implementation/scripts/prod/10_udp_sender_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --dest_ip 127.0.0.1 --port 5005 --source dataset --split test --block_len 30 --n_blocks 10 --zlib_level 1
 ```
 
-3. Produccion SDR:
+3. Run the SDR production path:
+
 ```bash
 python VAE_implementation/scripts/prod/12_acq_sensor_to_zmq.py \
   --mode callable \
   --sensor_repo_path /home/pi/SDR-SpectrumMonitoring-Sensor \
-  --callable "mi_modulo.mi_fuente:get_next_psd" \
+  --callable "my_module.my_source:get_next_psd" \
   --ipc "ipc:///tmp/ane_psd.ipc" \
   --out_key psd_dbm
 
@@ -58,11 +65,12 @@ python VAE_implementation/scripts/prod/11_edge_hackrf_psd_zmq_to_udp.py \
   --config VAE_implementation/configs/vae_default.yaml \
   --use_global_best \
   --ipc "ipc:///tmp/ane_psd.ipc" \
-  --dest_ip <IP_SERVIDOR> --port 5005 \
+  --dest_ip <SERVER_IP> --port 5005 \
   --block_len 30 --zlib_level 1
 ```
 
-Alternativa sin modificar repo SDR:
+Alternative without modifying the SDR repository:
+
 ```bash
 python VAE_implementation/scripts/prod/13_rf_engine_controller_to_zmq.py \
   --rf_ipc "ipc:///tmp/rf_engine" \
@@ -72,23 +80,23 @@ python VAE_implementation/scripts/prod/13_rf_engine_controller_to_zmq.py \
   --send_cmd_every_s 1.0
 ```
 
-## 6. Consideraciones tecnicas
+## 6. Technical considerations
 
-- Normalizacion esperada: `global_minmax` con `gmin/gmax` del dataset procesado.
-- Si PSD ya viene normalizada [0,1], usar `--already_normalized` en script `11`.
-- Ajustar `block_len` y `zlib_level` para balance latencia/compresion.
-- La adquisicion de dataset se realiza fuera de este repositorio.
+- Expected normalization: `global_minmax` using the `gmin/gmax` values from the processed dataset
+- If the PSD stream is already normalized to `[0, 1]`, use `--already_normalized` with script `11`
+- Tune `block_len` and `zlib_level` to balance latency and compression ratio
+- Dataset acquisition happens outside this repository
 
-## 7. Salidas y metricas
+## 7. Outputs and metrics
 
 - `models/GLOBAL_BEST/udp_prod/`
 
-Archivos comunes:
+Common files:
 - `udp_prod_metrics.json`
 - `waterfall_recon.png`
 - `psd_last.png`
 
-Modo comparacion:
+Comparison mode:
 - `waterfall_orig.png`
 - `overlay_pktXXXXXX.png`
 - `orig_last_psd.npy`
@@ -96,6 +104,6 @@ Modo comparacion:
 
 ## 8. Troubleshooting
 
-- Sin trafico UDP: revisar IP/puerto/firewall.
-- Sin PSD en bridge: validar endpoint ZMQ y llave JSON (`--psd_key`).
-- Error TFLite en Windows: usar `tf.lite.Interpreter` fallback.
+- No UDP traffic: check the IP, port, and firewall
+- No PSD frames in the bridge: validate the ZMQ endpoint and JSON key (`--psd_key`)
+- TFLite error on Windows: use the `tf.lite.Interpreter` fallback

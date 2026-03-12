@@ -1,3 +1,5 @@
+"""Deterministic FWHT codec primitives for PSD frame compression."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -148,8 +150,15 @@ def inverse_fwht_orthonormal(values: Array1D) -> Array1D:
 
 
 def select_topk_coefficients(coefficients: Array1D, top_k: int) -> Tuple[Array1D, Array1D]:
+    """Return the ``top_k`` highest-magnitude coefficients and their indices."""
+
     n = coefficients.size
-    k = int(max(1, min(top_k, n)))
+    if top_k < 1:
+        raise ValueError("top_k must be >= 1")
+    if top_k > n:
+        raise ValueError(f"top_k={top_k} exceeds the available coefficient count {n}")
+
+    k = int(top_k)
     # argpartition is O(n) average and deterministic for fixed input.
     idx_unsorted = np.argpartition(np.abs(coefficients), -k)[-k:]
     # Sort indices for stable packet serialization.
@@ -230,4 +239,3 @@ def reconstruction_metrics(original_frame: Array1D, reconstructed_frame: Array1D
             original_frame, reconstructed_frame, margin_db=occupancy_margin_db
         ),
     }
-

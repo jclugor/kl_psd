@@ -1,10 +1,10 @@
 # 00_get_data.ps1 ??? Clone or update the RF CSV dataset into data/raw/
-# Run from repo root: .\VAE_implementation\scripts\00_get_data.ps1
+# Run from repo root: .\VAE_implementation\scripts\training\00_get_data.ps1
 
 $ErrorActionPreference = "Stop"
 
-# Repo root = folder where this script lives: ...\VAE_implementation\scripts -> go up 2
-$RootDir = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+# Repo root = folder where this script lives: ...\VAE_implementation\scripts\training -> go up 3
+$RootDir = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
 $RawDir = Join-Path $RootDir "data\raw"
 $DatasetDir = Join-Path $RawDir "DataBase-RF-FM-88MHz-108MHz-Bogota-Funza"
 $RepoUrl = "https://github.com/dramirezbe/DataBase-RF-FM-88MHz-108MHz-Bogota-Funza.git"

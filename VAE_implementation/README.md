@@ -35,7 +35,7 @@ Notas:
 ## Pipeline base
 
 ```powershell
-.\VAE_implementation\scripts\00_get_data.ps1
+.\VAE_implementation\scripts\training\00_get_data.ps1
 python VAE_implementation/scripts/training/01_preprocess.py --config VAE_implementation/configs/vae_default.yaml
 python VAE_implementation/scripts/training/02_train.py --config VAE_implementation/configs/vae_default.yaml
 python VAE_implementation/scripts/training/03_eval.py --config VAE_implementation/configs/vae_default.yaml --use_global_best
@@ -46,6 +46,11 @@ python VAE_implementation/scripts/training/04_export_tflite.py --config VAE_impl
 
 La adquisicion de dataset se realiza fuera de este repositorio. Este repo asume que ya existe
 un pipeline externo que produce PSD en tiempo real o por lotes.
+
+Si `data/raw/DataBase-RF-FM-88MHz-108MHz-Bogota-Funza` no esta disponible, el
+preprocess usa primero el dataset procesado existente y, si ese dataset no
+existe, puede caer al export de campana en `data/campaigns/MeasurementCalibration`
+para smoke tests locales.
 
 ## Test local 
 

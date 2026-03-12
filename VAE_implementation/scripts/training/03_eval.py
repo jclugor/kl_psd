@@ -45,8 +45,9 @@ from tensorflow.keras import layers
 # Paths / utils
 # -----------------------------
 def repo_root() -> Path:
-    # .../kl_psd/VAE_implementation/scripts/training/03_eval.py -> parents[2] = kl_psd
-    return Path(__file__).resolve().parents[2]
+    """Return the project root for repository-relative config paths."""
+
+    return Path(__file__).resolve().parents[3]
 
 
 def ensure_dir(p: Path) -> None:

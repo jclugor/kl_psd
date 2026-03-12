@@ -17,8 +17,12 @@ def _dataset_path(cfg: Dict[str, Any]) -> Path:
 
 def _codec_config(cfg: Dict[str, Any]) -> KLPCAConfig:
     fit_cfg = cfg.get("fit", {})
+    n_components = int(fit_cfg.get("n_components", 32))
+    if n_components < 1:
+        raise ValueError("fit.n_components must be >= 1")
+
     return KLPCAConfig(
-        n_components=int(fit_cfg.get("n_components", 32)),
+        n_components=n_components,
         center=bool(fit_cfg.get("center", True)),
         enforce_nonnegative=bool(cfg.get("codec", {}).get("enforce_nonnegative", True)),
     )
@@ -207,4 +211,3 @@ def run_evaluate(
     out_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     report["report_path"] = str(out_path)
     return report
-

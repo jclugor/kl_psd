@@ -1,3 +1,5 @@
+"""KL/PCA core model helpers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,14 +22,24 @@ class KLPCAModel:
 
 
 def fit_kl_pca(frames: np.ndarray, n_components: int = 32, center: bool = True) -> KLPCAModel:
+    """Fit a KL/PCA basis from a PSD frame matrix."""
+
     x = np.asarray(frames, dtype=np.float64)
     if x.ndim != 2:
         raise ValueError("frames must have shape [num_frames, num_bins]")
     n_samples, n_bins = x.shape
     if n_samples < 2:
         raise ValueError("need at least 2 frames to fit KL/PCA")
+    if n_components < 1:
+        raise ValueError("n_components must be >= 1")
 
-    r = int(max(1, min(n_components, n_samples, n_bins)))
+    max_components = min(n_samples, n_bins)
+    if n_components > max_components:
+        raise ValueError(
+            f"n_components={n_components} exceeds the maximum admissible value {max_components}"
+        )
+
+    r = int(n_components)
     mean = np.mean(x, axis=0) if center else np.zeros(n_bins, dtype=np.float64)
     xc = x - mean[None, :]
 
@@ -42,14 +54,29 @@ def fit_kl_pca(frames: np.ndarray, n_components: int = 32, center: bool = True) 
 
 
 def encode_frame(frame: np.ndarray, model: KLPCAModel) -> np.ndarray:
+    """Project one PSD frame into the learned KL/PCA basis."""
+
     x = np.asarray(frame, dtype=np.float64).reshape(-1)
+    if model.components.ndim != 2 or model.mean.ndim != 1:
+        raise ValueError("model components and mean must be one- and two-dimensional arrays")
+    if x.shape[0] != model.mean.shape[0]:
+        raise ValueError(
+            f"frame has {x.shape[0]} bins but model expects {model.mean.shape[0]}"
+        )
     return (x - model.mean) @ model.components.T
 
 
 def decode_coefficients(coeffs: np.ndarray, model: KLPCAModel, enforce_nonnegative: bool = True) -> np.ndarray:
+    """Reconstruct one PSD frame from KL/PCA coefficients."""
+
     c = np.asarray(coeffs, dtype=np.float64).reshape(-1)
+    if model.components.ndim != 2 or model.mean.ndim != 1:
+        raise ValueError("model components and mean must be one- and two-dimensional arrays")
+    if c.shape[0] != model.components.shape[0]:
+        raise ValueError(
+            f"coeffs has length {c.shape[0]} but model expects {model.components.shape[0]}"
+        )
     recon = model.mean + c @ model.components
     if enforce_nonnegative:
         recon = np.maximum(recon, 0.0)
     return recon
-

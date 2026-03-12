@@ -39,7 +39,9 @@ import bz2
 # Repo helpers
 # -----------------------------
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    """Return the project root for repository-relative config paths."""
+
+    return Path(__file__).resolve().parents[3]
 
 
 def ensure_dir(p: Path) -> None:

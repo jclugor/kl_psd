@@ -20,9 +20,13 @@ from psd_compression.fwht.codec import (
 
 def _build_fwht_config(cfg: Dict[str, Any]) -> FWHTConfig:
     codec = cfg.get("codec", {})
+    top_k_coeffs = int(codec.get("top_k_coeffs", 128))
+    if top_k_coeffs < 1:
+        raise ValueError("codec.top_k_coeffs must be >= 1")
+
     return FWHTConfig(
         decimation_factor_bins=int(codec.get("decimation_factor_bins", 2)),
-        top_k_coeffs=int(codec.get("top_k_coeffs", 128)),
+        top_k_coeffs=top_k_coeffs,
         quant_step=float(codec.get("quant_step", 0.02)),
         nonlinear_mode=str(codec.get("nonlinear_mode", "signed_log1p")),
         nonlinear_alpha=float(codec.get("nonlinear_alpha", 1.5)),
@@ -173,4 +177,3 @@ def run_evaluate(
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     report["report_path"] = str(report_path)
     return report
-

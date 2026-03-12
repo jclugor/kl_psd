@@ -21,10 +21,10 @@ Nota: La adquisicion de dataset es externa a este repositorio.
 python3 -m venv .venv_edge
 source .venv_edge/bin/activate
 pip install --upgrade pip
-pip install numpy pyzmq pyyaml
+pip install numpy pyzmq pyyaml tflite-runtime
 ```
 
-Si `tflite-runtime` no existe para tu plataforma, usa `tensorflow`.
+Si `tflite-runtime` no existe para tu plataforma, instala `tensorflow` como reemplazo.
 
 ## Streaming VAE al servidor
 

@@ -1,5 +1,7 @@
 paths:
   raw_dataset_dir: "data/raw/DataBase-RF-FM-88MHz-108MHz-Bogota-Funza"
+  fallback_raw_dataset_dirs:
+    - "data/campaigns/MeasurementCalibration"
   processed_dir:   "data/processed/psd_1024"
   models_dir:      "VAE_implementation/models"
 
@@ -9,6 +11,7 @@ preprocess:
   use_db_clip: false
   db_min: -120.0
   db_max: 10.0
+  reuse_existing_processed_if_source_missing: true
   split:
     train: 0.80
     val:   0.10

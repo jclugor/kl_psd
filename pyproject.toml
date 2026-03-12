@@ -8,6 +8,28 @@ version = "0.1.0"
 description = "Unified PSD compression toolkit with FWHT, KL/PCA, and legacy VAE workflows."
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "PyYAML>=6.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.11",
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+vae = [
+    "matplotlib>=3.8",
+    "pyzmq>=26.0",
+    "tensorflow>=2.16",
+    "tflite-runtime; platform_system == \"Linux\" and platform_machine == \"aarch64\"",
+]
+
+[project.scripts]
+psd-compression = "psd_compression.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["api*", "psd_compression*"]

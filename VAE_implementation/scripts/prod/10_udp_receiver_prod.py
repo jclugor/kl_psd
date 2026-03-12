@@ -35,21 +35,27 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
-# Try lightweight TFLite runtime (optional). Receiver can use TF too.
-try:
-    from tflite_runtime.interpreter import Interpreter as TFLiteInterpreter
-except ModuleNotFoundError:
-    import tensorflow as tf
-
-    TFLiteInterpreter = tf.lite.Interpreter
+import tensorflow as tf
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    """Return the project root for repository-relative config paths."""
+
+    return Path(__file__).resolve().parents[3]
+
+
+def _resolve_tflite_interpreter() -> type:
+    """Load the preferred TFLite interpreter class on demand."""
+
+    try:
+        from tflite_runtime.interpreter import Interpreter as interpreter_cls
+
+        return interpreter_cls
+    except ModuleNotFoundError:
+        return tf.lite.Interpreter
 
 
 def ensure_dir(p: Path) -> None:
@@ -172,7 +178,7 @@ def main():
     tflite_path = model_dir / "encoder_mu_int8.tflite"
     if not tflite_path.exists():
         raise FileNotFoundError(f"TFLite encoder not found: {tflite_path}")
-    tfl = TFLiteInterpreter(model_path=str(tflite_path))
+    tfl = _resolve_tflite_interpreter()(model_path=str(tflite_path))
     tfl.allocate_tensors()
     out_det = tfl.get_output_details()[0]
     out_scale, out_zp = out_det["quantization"]

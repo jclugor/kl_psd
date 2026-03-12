@@ -34,17 +34,29 @@ import numpy as np
 import yaml
 import zlib
 
-# Try lightweight TFLite runtime first (Raspberry-friendly)
-try:
-    from tflite_runtime.interpreter import Interpreter as TFLiteInterpreter
-except ModuleNotFoundError:
-    import tensorflow as tf
-
-    TFLiteInterpreter = tf.lite.Interpreter
-
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    """Return the project root for repository-relative config paths."""
+
+    return Path(__file__).resolve().parents[3]
+
+
+def _resolve_tflite_interpreter() -> type:
+    """Load the preferred TFLite interpreter class on demand."""
+
+    try:
+        from tflite_runtime.interpreter import Interpreter as interpreter_cls
+
+        return interpreter_cls
+    except ModuleNotFoundError:
+        try:
+            import tensorflow as tf
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "Install `tflite-runtime` or `tensorflow` to run the UDP sender."
+            ) from exc
+
+        return tf.lite.Interpreter
 
 
 def load_pack_module() -> object:
@@ -77,7 +89,7 @@ def load_splits(processed_dir: Path):
 
 
 def load_tflite(tflite_path: Path):
-    interp = TFLiteInterpreter(model_path=str(tflite_path))
+    interp = _resolve_tflite_interpreter()(model_path=str(tflite_path))
     interp.allocate_tensors()
     in_det = interp.get_input_details()[0]
     out_det = interp.get_output_details()[0]

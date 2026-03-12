@@ -1,97 +1,35 @@
 #!/usr/bin/env python3
-"""
-Compara PSD original vs reconstruida desde archivos .npy y genera metricas + plots.
+"""Compatibility wrapper for the relocated PSD comparison utility."""
 
-Uso (desde raiz del repo):
-  python VAE_implementation/models/GLOBAL_BEST/udp_prod/compare_npy_metrics_plot.py
-
-Opcional:
-  python .../compare_npy_metrics_plot.py --orig path/orig.npy --recon path/recon.npy
-"""
+from __future__ import annotations
 
 import argparse
+from importlib.util import module_from_spec, spec_from_file_location
 import json
 from pathlib import Path
 
-import matplotlib
 import numpy as np
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+
+def _load_compare_module():
+    """Load the canonical comparison script from the analysis folder."""
+
+    repo_root = Path(__file__).resolve().parents[4]
+    module_path = repo_root / "VAE_implementation/scripts/analysis/compare_npy_metrics_plot.py"
+    spec = spec_from_file_location("vae_compare_metrics_plot", module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load compare utility from {module_path}")
+
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-def compute_metrics(orig: np.ndarray, recon: np.ndarray) -> dict:
-    err = recon - orig
-    mae = float(np.mean(np.abs(err)))
-    mse = float(np.mean(err**2))
-    rmse = float(np.sqrt(mse))
-    max_abs = float(np.max(np.abs(orig))) if orig.size else 0.0
-    nrmse = float(rmse / (max_abs + 1e-12))
+def main() -> None:
+    """Preserve the legacy CLI path while delegating to the canonical script."""
 
-    sig_pow = float(np.mean(orig**2))
-    noise_pow = float(np.mean((orig - recon) ** 2))
-    snr_db = float(10.0 * np.log10((sig_pow + 1e-12) / (noise_pow + 1e-12)))
+    compare_module = _load_compare_module()
 
-    data_range = float(np.max(orig) - np.min(orig))
-    psnr_db = float(20.0 * np.log10((data_range + 1e-12) / (rmse + 1e-12)))
-
-    if orig.size > 1 and np.std(orig) > 0 and np.std(recon) > 0:
-        corr = float(np.corrcoef(orig, recon)[0, 1])
-    else:
-        corr = float("nan")
-
-    return {
-        "len": int(orig.size),
-        "mae": mae,
-        "mse": mse,
-        "rmse": rmse,
-        "nrmse": nrmse,
-        "snr_db": snr_db,
-        "psnr_db": psnr_db,
-        "corrcoef": corr,
-    }
-
-
-def save_plots(orig: np.ndarray, recon: np.ndarray, out_dir: Path) -> None:
-    err = recon - orig
-    x = np.arange(orig.size)
-
-    plt.figure(figsize=(12, 4))
-    plt.plot(x, orig, label="orig", linewidth=1.5)
-    plt.plot(x, recon, label="recon", linewidth=1.2, alpha=0.9)
-    plt.title("PSD: Original vs Reconstruccion")
-    plt.xlabel("Bin")
-    plt.ylabel("Valor")
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(out_dir / "compare_overlay.png", dpi=180)
-    plt.close()
-
-    plt.figure(figsize=(12, 3))
-    plt.plot(x, err, label="error (recon-orig)", color="tab:red", linewidth=1.0)
-    plt.axhline(0.0, color="black", linewidth=0.8)
-    plt.title("Error por Bin")
-    plt.xlabel("Bin")
-    plt.ylabel("Error")
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(out_dir / "compare_error.png", dpi=180)
-    plt.close()
-
-    plt.figure(figsize=(6, 4))
-    plt.hist(err, bins=40, color="tab:blue", alpha=0.85)
-    plt.title("Histograma del Error")
-    plt.xlabel("Error")
-    plt.ylabel("Frecuencia")
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(out_dir / "compare_error_hist.png", dpi=180)
-    plt.close()
-
-
-def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--orig", default=None, help="Path a orig .npy")
     ap.add_argument("--recon", default=None, help="Path a recon .npy")
@@ -115,18 +53,18 @@ def main():
     orig = orig[:n]
     recon = recon[:n]
 
-    metrics = compute_metrics(orig, recon)
-    save_plots(orig, recon, out_dir)
+    metrics = compare_module.compute_metrics(orig, recon)
+    compare_module.save_plots(orig, recon, out_dir)
 
     metrics_path = out_dir / "compare_metrics.json"
-    metrics_path.write_text(json.dumps(metrics, indent=2))
+    metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
 
     print("[COMPARE] orig:", orig_path)
     print("[COMPARE] recon:", recon_path)
     print("[COMPARE] out_dir:", out_dir)
     print("[COMPARE] metrics:", metrics_path)
-    for k, v in metrics.items():
-        print(f"  - {k}: {v}")
+    for key, value in metrics.items():
+        print(f"  - {key}: {value}")
 
 
 if __name__ == "__main__":

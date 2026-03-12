@@ -2,7 +2,7 @@
 
 This repository now organizes PSD compression work under one official model set:
 
-- `KL/PCA` (canonical implementation in `implementation.ipynb`)
+- `KL/PCA` (canonical notebook in `notebooks/core/implementation.ipynb`)
 - `VAE` (production scripts preserved under `VAE_implementation/scripts/` with subfolders)
 - `FWHT` (deterministic transform codec in `psd_compression/fwht/`)
 
@@ -65,11 +65,24 @@ python VAE_implementation/scripts/training/01_preprocess.py --config VAE_impleme
 python VAE_implementation/scripts/training/02_train.py --config VAE_implementation/configs/vae_default.yaml
 ```
 
+## Project Layout
+
+- `psd_compression/`: canonical runtime package for CLI, FWHT, KL/PCA, and shared utilities.
+- `api/`: notebook-facing compatibility package for the remote measurement API client.
+- `VAE_implementation/`: legacy VAE workflow kept stable because its scripts still depend on fixed filesystem paths.
+- `configs/`: hand-edited runtime configuration files.
+- `data/`: datasets and campaign exports only.
+- `notebooks/`: all notebooks grouped by purpose (`core/`, `examples/`, `experiments/`, `data/`, `vae/`).
+- `docs/`: LaTeX sources plus published PDFs.
+- `deploy/`: deployment bundles and device-specific payloads.
+- `tests/`: repository verification.
+
 ## Key Paths
 
 - Unified package: `psd_compression/`
+- API client package: `api/` with canonical implementation in `psd_compression/api/`
 - New configs: `configs/fwht_default.yaml`, `configs/kl_pca_default.yaml`
 - KL/PCA module: `psd_compression/kl_pca/`
 - VAE scripts: `VAE_implementation/scripts/{training,analysis,codec,prod}/`
 - Report source/PDF: `docs/main.tex`, `docs/main.pdf`
-- Exploratory notebooks: `experiments/`
+- Notebook hub: `notebooks/`

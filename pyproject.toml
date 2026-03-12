@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kl-psd"
+version = "0.1.0"
+description = "Unified PSD compression toolkit with FWHT, KL/PCA, and legacy VAE workflows."
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+include = ["api*", "psd_compression*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

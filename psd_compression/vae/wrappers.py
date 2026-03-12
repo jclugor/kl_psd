@@ -1,34 +1,67 @@
+"""Compatibility adapters for the legacy VAE script tree."""
+
 from __future__ import annotations
 
+from collections.abc import Sequence
 import shlex
 import subprocess
 import sys
 from pathlib import Path
-from typing import List
 
 from psd_compression.common.io import repo_root
 
-VAE_SCRIPT_MAP = {
-    "preprocess": "VAE_implementation/scripts/01_preprocess.py",
-    "train": "VAE_implementation/scripts/02_train.py",
-    "eval": "VAE_implementation/scripts/03_eval.py",
-    "export": "VAE_implementation/scripts/04_export_tflite.py",
-    "entropy": "VAE_implementation/scripts/05_entropy_stats.py",
-    "benchmark": "VAE_implementation/scripts/06_codec_benchmark.py",
+
+VAE_SCRIPT_RELATIVE_PATHS: dict[str, Path] = {
+    "preprocess": Path("VAE_implementation/scripts/training/01_preprocess.py"),
+    "train": Path("VAE_implementation/scripts/training/02_train.py"),
+    "eval": Path("VAE_implementation/scripts/training/03_eval.py"),
+    "export": Path("VAE_implementation/scripts/training/04_export_tflite.py"),
+    "entropy": Path("VAE_implementation/scripts/analysis/05_entropy_stats.py"),
+    "benchmark": Path("VAE_implementation/scripts/analysis/06_codec_benchmark.py"),
 }
 
 
-def _normalize_script_args(script_args: List[str]) -> List[str]:
+def _normalize_script_args(script_args: Sequence[str]) -> list[str]:
+    """Drop the passthrough separator used by the unified CLI wrapper."""
+
     if script_args and script_args[0] == "--":
-        return script_args[1:]
-    return script_args
+        return list(script_args[1:])
+    return list(script_args)
 
 
-def run_vae_task(task: str, script_args: List[str], dry_run: bool = False) -> dict:
-    if task not in VAE_SCRIPT_MAP:
+def run_vae_task(
+    task: str,
+    script_args: Sequence[str],
+    dry_run: bool = False,
+) -> dict:
+    """Dispatch one VAE CLI task to the legacy script implementation.
+
+    Parameters
+    ----------
+    task:
+        Named VAE task exposed by ``python -m psd_compression.cli vae``.
+    script_args:
+        Extra CLI arguments forwarded to the selected legacy script.
+    dry_run:
+        When ``True``, return the resolved command without executing it.
+
+    Returns
+    -------
+    dict
+        Structured execution metadata for the selected task.
+
+    Side Effects
+    ------------
+    Executes the legacy VAE Python script in a subprocess when ``dry_run`` is
+    ``False``.
+    """
+
+    if task not in VAE_SCRIPT_RELATIVE_PATHS:
         raise ValueError(f"Unsupported VAE task: {task}")
 
-    script_path: Path = repo_root() / VAE_SCRIPT_MAP[task]
+    # Keep the legacy VAE tree stable on disk while exposing it through the
+    # unified package CLI.
+    script_path = repo_root() / VAE_SCRIPT_RELATIVE_PATHS[task]
     if not script_path.exists():
         raise FileNotFoundError(f"Legacy script not found: {script_path}")
 
@@ -50,4 +83,3 @@ def run_vae_task(task: str, script_args: List[str], dry_run: bool = False) -> di
         "return_code": int(completed.returncode),
         "command": " ".join(shlex.quote(arg) for arg in command),
     }
-

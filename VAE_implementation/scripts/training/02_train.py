@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-02_train.py — Train VAE for PSD compression (1024 bins) with robust local saving/resume.
+02_train.py ??? Train VAE for PSD compression (1024 bins) with robust local saving/resume.
 
 Features:
 - Loads preprocessed dataset (.npz) + splits from data/processed/...
 - Builds encoder/decoder (mirror architecture, latent_dim=32)
 - Objective: recon (MSE) + beta * KL
-- Training recon uses mu (deterministic), consistent with edge inference z≈mu
+- Training recon uses mu (deterministic), consistent with edge inference z???mu
 - Beta warm-up schedule
 - Optional "peaky 50/50" oversampling (data-level emphasis, no loss change)
 - Robust saving/resume: saves encoder/decoder weights separately (Keras 3 safe)
 - End-of-run promotion: compares run BEST vs GLOBAL_BEST, replaces only if better
 
 Usage:
-  python VAE_implementation/scripts/02_train.py --config VAE_implementation/configs/vae_default.yaml
+  python VAE_implementation/scripts/training/02_train.py --config VAE_implementation/configs/vae_default.yaml
 """
 
 import argparse
@@ -36,7 +36,7 @@ from tensorflow.keras import layers
 # Repo helpers
 # =============================
 def repo_root() -> Path:
-    # .../kl_psd/VAE_implementation/scripts/02_train.py -> parents[2] = kl_psd
+    # .../kl_psd/VAE_implementation/scripts/training/02_train.py -> parents[2] = kl_psd
     return Path(__file__).resolve().parents[2]
 
 
@@ -310,7 +310,7 @@ def promote_to_global_best(run_best_val: float,
             "source_run_dir": str(run_dir),
         }
         safe_write_json(g_info, info)
-        print("[GLOBAL UPDATE] Promoted this run to GLOBAL_BEST ✅")
+        print("[GLOBAL UPDATE] Promoted this run to GLOBAL_BEST ???")
     else:
         print("[GLOBAL UPDATE] Kept previous GLOBAL_BEST (this run not better)")
 
@@ -340,7 +340,7 @@ def load_dataset(processed_dir: Path) -> Tuple[np.ndarray, Optional[np.ndarray]]
 
     data = np.load(npz_path, allow_pickle=True)
     if "X" not in data:
-        raise KeyError(f"NPZ keys: {list(data.keys())} — expected 'X'.")
+        raise KeyError(f"NPZ keys: {list(data.keys())} ??? expected 'X'.")
     X = data["X"].astype(np.float32)
     freqs = data["freqs_hz"] if "freqs_hz" in data else None
     print("[DATA] Loaded:", npz_path)

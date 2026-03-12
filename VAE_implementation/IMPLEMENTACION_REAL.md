@@ -1,4 +1,4 @@
-﻿# IMPLEMENTACION_REAL.md
+# IMPLEMENTACION_REAL.md
 
 Guia operativa para despliegue real.
 
@@ -10,10 +10,11 @@ Guia operativa para despliegue real.
 
 ## 2. Scripts principales
 
-- `VAE_implementation/scripts/10_udp_sender_prod.py`
-- `VAE_implementation/scripts/10_udp_receiver_prod.py`
-- `VAE_implementation/scripts/11_edge_hackrf_psd_zmq_to_udp.py`
-- `VAE_implementation/scripts/12_acq_sensor_to_zmq.py` (adaptador para repo externo)
+- `VAE_implementation/scripts/prod/10_udp_sender_prod.py`
+- `VAE_implementation/scripts/prod/10_udp_receiver_prod.py`
+- `VAE_implementation/scripts/prod/11_edge_hackrf_psd_zmq_to_udp.py`
+- `VAE_implementation/scripts/prod/12_acq_sensor_to_zmq.py` (adaptador para repo externo)
+- `VAE_implementation/scripts/prod/13_rf_engine_controller_to_zmq.py` (controller propio para rf_engine)
 
 ## 3. Prerrequisitos
 
@@ -30,12 +31,12 @@ Artefactos minimos en `VAE_implementation/models/GLOBAL_BEST/`:
 
 Terminal A (receiver):
 ```powershell
-python VAE_implementation/scripts/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --save_every_packets 1 --idle_stop_s 3 --invert_norm_to_original --compare_split test --plot_every_packets 1
+python VAE_implementation/scripts/prod/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 127.0.0.1 --port 5005 --save_every_packets 1 --idle_stop_s 3 --invert_norm_to_original --compare_split test --plot_every_packets 1
 ```
 
 Terminal B (sender):
 ```powershell
-python VAE_implementation/scripts/10_udp_sender_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --dest_ip 127.0.0.1 --port 5005 --source dataset --split test --block_len 30 --n_blocks 10 --zlib_level 1
+python VAE_implementation/scripts/prod/10_udp_sender_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --dest_ip 127.0.0.1 --port 5005 --source dataset --split test --block_len 30 --n_blocks 10 --zlib_level 1
 ```
 
 Salida:
@@ -45,12 +46,12 @@ Salida:
 
 Servidor:
 ```powershell
-python VAE_implementation/scripts/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 0.0.0.0 --port 5005 --save_every_packets 10 --idle_stop_s 10 --invert_norm_to_original
+python VAE_implementation/scripts/prod/10_udp_receiver_prod.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --bind_ip 0.0.0.0 --port 5005 --save_every_packets 10 --idle_stop_s 10 --invert_norm_to_original
 ```
 
 Edge bridge:
 ```bash
-python VAE_implementation/scripts/11_edge_hackrf_psd_zmq_to_udp.py \
+python VAE_implementation/scripts/prod/11_edge_hackrf_psd_zmq_to_udp.py \
   --config VAE_implementation/configs/vae_default.yaml \
   --use_global_best \
   --ipc "ipc:///tmp/ane_psd.ipc" \
@@ -58,28 +59,31 @@ python VAE_implementation/scripts/11_edge_hackrf_psd_zmq_to_udp.py \
   --block_len 30 --zlib_level 1
 ```
 
-## 6. Integracion con repo de adquisicion externo
+## 6. Adquisicion externa
 
-Para conectar `SDR-SpectrumMonitoring-Sensor` al IPC del bridge:
+La adquisicion de PSD se realiza fuera de este repositorio. El pipeline externo debe
+publicar PSD en ZMQ/JSON al IPC `ipc:///tmp/ane_psd.ipc` para que el bridge pueda consumirlo.
 
-Modo callable:
+### 6.1 Adaptador por callable/script
+
 ```bash
-python VAE_implementation/scripts/12_acq_sensor_to_zmq.py \
+python VAE_implementation/scripts/prod/12_acq_sensor_to_zmq.py \
   --mode callable \
   --sensor_repo_path /home/pi/SDR-SpectrumMonitoring-Sensor \
   --callable "mi_modulo.mi_fuente:get_next_psd" \
-  --callable_kwargs_json "{}" \
   --ipc "ipc:///tmp/ane_psd.ipc" \
   --out_key psd_dbm
 ```
 
-Modo script (stdout JSON):
+### 6.2 Controller propio para rf_engine
+
 ```bash
-python VAE_implementation/scripts/12_acq_sensor_to_zmq.py \
-  --mode script \
-  --script_cmd "python3 /home/pi/SDR-SpectrumMonitoring-Sensor/run_sensor.py --json" \
-  --ipc "ipc:///tmp/ane_psd.ipc" \
-  --out_key psd_dbm
+python VAE_implementation/scripts/prod/13_rf_engine_controller_to_zmq.py \
+  --rf_ipc "ipc:///tmp/rf_engine" \
+  --out_ipc "ipc:///tmp/ane_psd.ipc" \
+  --in_key Pxx \
+  --cmd_json '{"center_freq_hz":100100000,"sample_rate_hz":2000000,"rbw_hz":10000,"window":"hann","overlap":0.5,"lna_gain":16,"vga_gain":20,"antenna_amp":false,"antenna_port":0}' \
+  --send_cmd_every_s 1.0
 ```
 
 ## 7. Formato de PSD por ZMQ
@@ -105,7 +109,7 @@ Revisar:
 - `waterfall_orig.png` (si compare mode)
 - `recon_last_psd.npy` y `orig_last_psd.npy` (si compare mode)
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 - `Missing encoder_mu_int8.tflite`: ejecutar `04_export_tflite.py`.
 - `ImportError tensorflow.lite.Interpreter`: actualizar entorno o usar `tflite-runtime`.

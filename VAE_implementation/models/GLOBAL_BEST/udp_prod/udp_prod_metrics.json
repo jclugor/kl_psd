@@ -1,17 +1,17 @@
 {
   "tag": "GLOBAL_BEST",
-  "packets": 3,
-  "frames": 90,
-  "bytes_total": 2872,
-  "avg_bytes_per_frame": 31.91111111111111,
-  "frames_per_second": 7.527958461332175,
+  "packets": 15,
+  "frames": 450,
+  "bytes_total": 10413,
+  "avg_bytes_per_frame": 23.14,
+  "frames_per_second": 0.7929744028481274,
   "seq_gaps": 0,
-  "out_of_order": 0,
+  "out_of_order": 1,
   "dequant": {
     "out_scale": 0.0004932410665787756,
     "out_zero_point": -8
   },
   "scale": "original",
   "compare_split": "test",
-  "compare_frames_used": 90
+  "compare_frames_used": 96
 }

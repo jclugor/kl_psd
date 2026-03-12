@@ -1,0 +1,10 @@
+{
+  "experiment_name": "fm_extended_v1",
+  "total_sessions": 1,
+  "total_sessions_possible": 17496000,
+  "total_locations": 3,
+  "total_scenarios": 5,
+  "repeats_per_profile": 3,
+  "capture_duration_s": 180,
+  "estimated_total_hours": 0.05
+}

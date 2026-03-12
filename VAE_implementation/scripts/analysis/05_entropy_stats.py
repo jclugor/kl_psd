@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-05_entropy_stats.py — Estimate bitrate/entropy of the INT8 latent (mu) and its temporal delta.
+05_entropy_stats.py ??? Estimate bitrate/entropy of the INT8 latent (mu) and its temporal delta.
 
 Inputs:
 - Preprocessed dataset (.npz) and metadata.csv (timestamps)
@@ -14,7 +14,7 @@ Computes:
 - Approx bytes/frame for raw mu and delta-coded mu (entropy lower bound)
 
 Usage:
-  python VAE_implementation/scripts/05_entropy_stats.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --split test
+  python VAE_implementation/scripts/analysis/05_entropy_stats.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --split test
 """
 
 import argparse
@@ -55,7 +55,7 @@ def load_npz(processed_dir: Path) -> np.ndarray:
         npz_path = candidates[0]
     data = np.load(npz_path, allow_pickle=True)
     if "X" not in data:
-        raise KeyError(f"NPZ keys: {list(data.keys())} — expected 'X'.")
+        raise KeyError(f"NPZ keys: {list(data.keys())} ??? expected 'X'.")
     return data["X"].astype(np.float32)
 
 

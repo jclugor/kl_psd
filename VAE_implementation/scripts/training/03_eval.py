@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-03_eval.py — Evaluate VAE (encoder/decoder) on the test split and save metrics + plots locally.
+03_eval.py ??? Evaluate VAE (encoder/decoder) on the test split and save metrics + plots locally.
 
 What it does:
 - Loads preprocessed dataset (.npz) + splits from data/processed/...
@@ -8,7 +8,7 @@ What it does:
     * by default: RUN best (enc_best/dec_best)
     * optional: RUN latest (enc_latest/dec_latest)
     * optional: GLOBAL_BEST (enc_best/dec_best under GLOBAL_BEST)
-- Runs deterministic inference (z ≈ mu), consistent with edge deployment
+- Runs deterministic inference (z ??? mu), consistent with edge deployment
 - Computes:
     * recon_loss: mean over batch of sum_{bins}(x - x_hat)^2
     * kl_loss: mean over batch of KL(q(z|x)||N(0,I))
@@ -19,9 +19,9 @@ What it does:
     * eval/ plots: recon overlays, hist, waterfalls
 
 Usage:
-  python VAE_implementation/scripts/03_eval.py --config VAE_implementation/configs/vae_default.yaml --run_name run_current
-  python VAE_implementation/scripts/03_eval.py --config ... --use_global_best
-  python VAE_implementation/scripts/03_eval.py --config ... --run_name run_current --use_latest
+  python VAE_implementation/scripts/training/03_eval.py --config VAE_implementation/configs/vae_default.yaml --run_name run_current
+  python VAE_implementation/scripts/training/03_eval.py --config ... --use_global_best
+  python VAE_implementation/scripts/training/03_eval.py --config ... --run_name run_current --use_latest
 """
 
 import argparse
@@ -45,7 +45,7 @@ from tensorflow.keras import layers
 # Paths / utils
 # -----------------------------
 def repo_root() -> Path:
-    # .../kl_psd/VAE_implementation/scripts/03_eval.py -> parents[2] = kl_psd
+    # .../kl_psd/VAE_implementation/scripts/training/03_eval.py -> parents[2] = kl_psd
     return Path(__file__).resolve().parents[2]
 
 
@@ -124,7 +124,7 @@ def load_dataset(processed_dir: Path) -> Tuple[np.ndarray, Optional[np.ndarray],
 
     data = np.load(npz_path, allow_pickle=True)
     if "X" not in data:
-        raise KeyError(f"NPZ keys: {list(data.keys())} — expected 'X'.")
+        raise KeyError(f"NPZ keys: {list(data.keys())} ??? expected 'X'.")
     X = data["X"].astype(np.float32)
     freqs = data["freqs_hz"] if "freqs_hz" in data else None
 
@@ -201,7 +201,7 @@ def plot_overlays(save_path: Path, X: np.ndarray, X_hat: np.ndarray, title: str,
         ax.grid(True)
         if i == 1:
             ax.legend()
-        ax.set_title(f"{title} — sample {j}")
+        ax.set_title(f"{title} ??? sample {j}")
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=200)
@@ -314,7 +314,7 @@ def main():
     mu_all, logvar_all, xhat_all = [], [], []
     for xb in ds:
         mu, logvar = encoder(xb, training=False)
-        x_hat = decoder(mu, training=False)  # deterministic z≈mu
+        x_hat = decoder(mu, training=False)  # deterministic z???mu
         mu_all.append(mu.numpy())
         logvar_all.append(logvar.numpy())
         xhat_all.append(x_hat.numpy())
@@ -362,17 +362,17 @@ def main():
 
     # Plots
     plot_overlays(eval_dir / "recon_random.png", X_test, X_hat,
-                  f"{tag} — random recon overlays", freqs_mhz=freqs_mhz, n=args.n_plots)
+                  f"{tag} ??? random recon overlays", freqs_mhz=freqs_mhz, n=args.n_plots)
 
     # Peaky overlays: top samples by max(orig)
     mx = X_test.max(axis=1).squeeze(-1)
     top_idx = np.argsort(-mx)[:min(args.n_plots, len(mx))]
     plot_overlays(eval_dir / "recon_peaky.png", X_test[top_idx], X_hat[top_idx],
-                  f"{tag} — peaky overlays (top max)", freqs_mhz=freqs_mhz, n=len(top_idx))
+                  f"{tag} ??? peaky overlays (top max)", freqs_mhz=freqs_mhz, n=len(top_idx))
 
-    plot_hist(eval_dir / "hist_values.png", X_test, f"{tag} — histogram (test)")
-    plot_waterfall(eval_dir / "waterfall_orig.png", X_test, f"{tag} — waterfall (orig)")
-    plot_waterfall(eval_dir / "waterfall_recon.png", X_hat, f"{tag} — waterfall (recon)")
+    plot_hist(eval_dir / "hist_values.png", X_test, f"{tag} ??? histogram (test)")
+    plot_waterfall(eval_dir / "waterfall_orig.png", X_test, f"{tag} ??? waterfall (orig)")
+    plot_waterfall(eval_dir / "waterfall_recon.png", X_hat, f"{tag} ??? waterfall (recon)")
 
     print("[EVAL] Plots saved in:", eval_dir)
     print("[EVAL] recon_loss:", recon, "kl_loss:", kl, "total:", total)

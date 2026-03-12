@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-04_export_tflite.py — Export encoder_mu_only to TFLite INT8 (PTQ) for Raspberry Pi deployment.
+04_export_tflite.py ??? Export encoder_mu_only to TFLite INT8 (PTQ) for Raspberry Pi deployment.
 
 What it does:
 - Loads preprocessed dataset (.npz) from data/processed/...
@@ -16,10 +16,10 @@ What it does:
 - Saves export_report.json with metrics and file paths
 
 Usage:
-  python VAE_implementation/scripts/04_export_tflite.py --config VAE_implementation/configs/vae_default.yaml
-  python VAE_implementation/scripts/04_export_tflite.py --config ... --run_name run_current
-  python VAE_implementation/scripts/04_export_tflite.py --config ... --use_latest
-  python VAE_implementation/scripts/04_export_tflite.py --config ... --use_global_best
+  python VAE_implementation/scripts/training/04_export_tflite.py --config VAE_implementation/configs/vae_default.yaml
+  python VAE_implementation/scripts/training/04_export_tflite.py --config ... --run_name run_current
+  python VAE_implementation/scripts/training/04_export_tflite.py --config ... --use_latest
+  python VAE_implementation/scripts/training/04_export_tflite.py --config ... --use_global_best
 
 Outputs:
   VAE_implementation/models/GLOBAL_BEST/encoder_mu_int8.tflite   (if global)
@@ -47,7 +47,7 @@ from tensorflow.keras import layers
 # Repo helpers
 # -----------------------------
 def repo_root() -> Path:
-    # .../kl_psd/VAE_implementation/scripts/04_export_tflite.py -> parents[2] = kl_psd
+    # .../kl_psd/VAE_implementation/scripts/training/04_export_tflite.py -> parents[2] = kl_psd
     return Path(__file__).resolve().parents[2]
 
 
@@ -102,7 +102,7 @@ def load_npz(processed_dir: Path) -> np.ndarray:
 
     data = np.load(npz_path, allow_pickle=True)
     if "X" not in data:
-        raise KeyError(f"NPZ keys: {list(data.keys())} — expected 'X'.")
+        raise KeyError(f"NPZ keys: {list(data.keys())} ??? expected 'X'.")
     X = data["X"].astype(np.float32)  # (N,1024)
     return X
 

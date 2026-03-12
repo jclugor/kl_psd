@@ -1,10 +1,10 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 12_acq_sensor_to_zmq.py - Adaptador de adquisicion externa -> ZMQ IPC JSON PSD.
 
 Objetivo:
 - Integrar librerias/scripts de adquisicion SDR externos (ej. SDR-SpectrumMonitoring-Sensor)
-- Publicar PSD en el endpoint IPC que consumen:
+- Publicar PSD en el endpoint IPC que consume:
   - 11_edge_hackrf_psd_zmq_to_udp.py
 
 Modos:
@@ -109,8 +109,7 @@ def iter_from_script(command: str) -> Iterator[Any]:
             try:
                 yield json.loads(line)
             except json.JSONDecodeError:
-                # logs del proceso externo: se imprimen para debug y se ignoran
-                print(f"[ACQ13] passthrough: {line}")
+                print(f"[ACQ12] passthrough: {line}")
     finally:
         proc.terminate()
         try:
@@ -153,7 +152,7 @@ def main():
     ctx = zmq.Context.instance()
     zs = ctx.socket(zmq.PAIR)
     zs.connect(args.ipc)
-    print(f"[ACQ13] mode={args.mode} -> connect {args.ipc} out_key={args.out_key}")
+    print(f"[ACQ12] mode={args.mode} -> connect {args.ipc} out_key={args.out_key}")
 
     n = 0
     t0 = time.perf_counter()
@@ -173,12 +172,12 @@ def main():
 
             if args.log_every > 0 and (n % args.log_every == 0):
                 dt = max(1e-9, time.perf_counter() - t0)
-                print(f"[ACQ13] sent={n} fps={n/dt:.1f} bins={psd.shape[0]}")
+                print(f"[ACQ12] sent={n} fps={n/dt:.1f} bins={psd.shape[0]}")
 
     except KeyboardInterrupt:
         pass
 
-    print("[ACQ13] stopped.")
+    print("[ACQ12] stopped.")
 
 
 if __name__ == "__main__":

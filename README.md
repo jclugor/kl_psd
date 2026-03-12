@@ -3,7 +3,7 @@
 This repository now organizes PSD compression work under one official model set:
 
 - `KL/PCA` (canonical implementation in `implementation.ipynb`)
-- `VAE` (legacy production scripts preserved under `VAE_implementation/scripts/`)
+- `VAE` (production scripts preserved under `VAE_implementation/scripts/` with subfolders)
 - `FWHT` (deterministic transform codec in `psd_compression/fwht/`)
 
 ## Quick Start
@@ -61,8 +61,8 @@ python -m psd_compression.cli kl-pca evaluate --config configs/kl_pca_default.ya
 Legacy commands remain valid. For example:
 
 ```powershell
-python VAE_implementation/scripts/01_preprocess.py --config VAE_implementation/configs/vae_default.yaml
-python VAE_implementation/scripts/02_train.py --config VAE_implementation/configs/vae_default.yaml
+python VAE_implementation/scripts/training/01_preprocess.py --config VAE_implementation/configs/vae_default.yaml
+python VAE_implementation/scripts/training/02_train.py --config VAE_implementation/configs/vae_default.yaml
 ```
 
 ## Key Paths
@@ -70,6 +70,6 @@ python VAE_implementation/scripts/02_train.py --config VAE_implementation/config
 - Unified package: `psd_compression/`
 - New configs: `configs/fwht_default.yaml`, `configs/kl_pca_default.yaml`
 - KL/PCA module: `psd_compression/kl_pca/`
-- VAE scripts: `VAE_implementation/scripts/`
+- VAE scripts: `VAE_implementation/scripts/{training,analysis,codec,prod}/`
 - Report source/PDF: `docs/main.tex`, `docs/main.pdf`
 - Exploratory notebooks: `experiments/`

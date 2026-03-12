@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-10_udp_sender_prod.py — Production UDP sender (edge/Raspberry).
+10_udp_sender_prod.py ??? Production UDP sender (edge/Raspberry).
 
 Sends ONLY what is needed in production:
 - packet header (KLP1) + zlib(payload)
@@ -21,7 +21,7 @@ Requires on Raspberry:
 - fallback: tensorflow (heavier)
 
 Run example (sim):
-  python VAE_implementation/scripts/10_udp_sender_prod.py --config ... --use_global_best --dest_ip <server_ip> --port 5005 --source dataset --split test --block_len 30 --n_blocks 50
+  python VAE_implementation/scripts/prod/10_udp_sender_prod.py --config ... --use_global_best --dest_ip <server_ip> --port 5005 --source dataset --split test --block_len 30 --n_blocks 50
 """
 
 import argparse
@@ -49,7 +49,7 @@ def repo_root() -> Path:
 
 def load_pack_module() -> object:
     root = repo_root()
-    mod_path = root / "VAE_implementation" / "scripts" / "07_pack_unpack.py"
+    mod_path = root / "VAE_implementation" / "scripts" / "codec" / "07_pack_unpack.py"
     spec = importlib.util.spec_from_file_location("packmod", str(mod_path))
     mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader

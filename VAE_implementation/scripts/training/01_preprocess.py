@@ -6,7 +6,7 @@ import pandas as pd
 import yaml
 
 def repo_root() -> Path:
-    # .../kl_psd/VAE_implementation/scripts/01_preprocess.py -> parents[2] = kl_psd
+    # .../kl_psd/VAE_implementation/scripts/training/01_preprocess.py -> parents[2] = kl_psd
     return Path(__file__).resolve().parents[2]
 
 def list_csv_files(folder: Path):

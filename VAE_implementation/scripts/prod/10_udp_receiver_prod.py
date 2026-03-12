@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-10_udp_receiver_prod.py — Production UDP receiver (server side).
+10_udp_receiver_prod.py ??? Production UDP receiver (server side).
 
 Receives production packets (no indices):
 - packet -> decode_packet_to_mu() -> mu_int8 block (L,32)
@@ -15,7 +15,7 @@ Robust:
 - seq gap / out-of-order logging
 
 Usage:
-  python VAE_implementation/scripts/10_udp_receiver_prod.py --config ... --use_global_best --bind_ip 0.0.0.0 --port 5005 --idle_stop_s 10
+  python VAE_implementation/scripts/prod/10_udp_receiver_prod.py --config ... --use_global_best --bind_ip 0.0.0.0 --port 5005 --idle_stop_s 10
 
 Outputs:
   <model_dir>/udp_prod/
@@ -58,7 +58,7 @@ def ensure_dir(p: Path) -> None:
 
 def load_pack_module() -> object:
     root = repo_root()
-    mod_path = root / "VAE_implementation" / "scripts" / "07_pack_unpack.py"
+    mod_path = root / "VAE_implementation" / "scripts" / "codec" / "07_pack_unpack.py"
     spec = importlib.util.spec_from_file_location("packmod", str(mod_path))
     mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 11_edge_hackrf_psd_zmq_to_udp.py - Edge bridge (production):
 ZMQ JSON PSD -> normalize/resample -> encoder TFLite INT8 -> UDP packet stream.
@@ -33,7 +33,7 @@ def repo_root() -> Path:
 
 def load_pack_module() -> object:
     root = repo_root()
-    mod_path = root / "VAE_implementation" / "scripts" / "07_pack_unpack.py"
+    mod_path = root / "VAE_implementation" / "scripts" / "codec" / "07_pack_unpack.py"
     spec = importlib.util.spec_from_file_location("packmod", str(mod_path))
     mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader

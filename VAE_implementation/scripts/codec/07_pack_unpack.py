@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-07_pack_unpack.py — Packet format + pack/unpack for mu_int8 streams (32 dims).
+07_pack_unpack.py ??? Packet format + pack/unpack for mu_int8 streams (32 dims).
 
 This file is the "wire format" building block for the edge->server UDP pipeline.
 
@@ -12,7 +12,7 @@ Concept:
 - You compress the block bytes with zlib.
 - You wrap it with a small binary header for UDP streaming.
 
-Header (big-endian) — 24 bytes total:
+Header (big-endian) ??? 24 bytes total:
 - magic      4s   = b"KLP1"
 - version    u8   = 1
 - flags      u8   bit0=keyframe (1 if block starts absolute mu0)
@@ -25,7 +25,7 @@ Then: payload bytes (zlib compressed block)
 Usage:
 - Import functions from this file in your UDP sender/receiver.
 - Or run self-test:
-    python VAE_implementation/scripts/07_pack_unpack.py --self_test
+    python VAE_implementation/scripts/codec/07_pack_unpack.py --self_test
 """
 
 import argparse
@@ -266,7 +266,7 @@ def main():
         self_test(n_frames=args.n_frames, block_len=args.block_len, zlib_level=args.zlib_level)
     else:
         print("This module is meant to be imported by UDP sender/receiver scripts.")
-        print("Run self-test with: python VAE_implementation/scripts/07_pack_unpack.py --self_test")
+        print("Run self-test with: python VAE_implementation/scripts/codec/07_pack_unpack.py --self_test")
 
 
 if __name__ == "__main__":

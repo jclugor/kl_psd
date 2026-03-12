@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-06_codec_benchmark.py — End-to-end benchmark with timing (encode -> packetize -> compress -> decompress -> unpack -> reconstruct)
+06_codec_benchmark.py ??? End-to-end benchmark with timing (encode -> packetize -> compress -> decompress -> unpack -> reconstruct)
 
 Uses:
 - TFLite INT8 encoder_mu model to produce mu_int8 (32 bytes/frame)
@@ -13,8 +13,8 @@ Outputs:
 - codec_report.json saved into the selected model directory (GLOBAL_BEST or runs/<run_name>)
 
 Run examples:
-  python VAE_implementation/scripts/06_codec_benchmark.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --split train --keyframe_every 30
-  python VAE_implementation/scripts/06_codec_benchmark.py --config ... --run_name run_current --split test --keyframe_every 30
+  python VAE_implementation/scripts/analysis/06_codec_benchmark.py --config VAE_implementation/configs/vae_default.yaml --use_global_best --split train --keyframe_every 30
+  python VAE_implementation/scripts/analysis/06_codec_benchmark.py --config ... --run_name run_current --split test --keyframe_every 30
 """
 
 import argparse
@@ -62,7 +62,7 @@ def load_npz(processed_dir: Path) -> np.ndarray:
         npz_path = candidates[0]
     data = np.load(npz_path, allow_pickle=True)
     if "X" not in data:
-        raise KeyError(f"NPZ keys: {list(data.keys())} — expected 'X'.")
+        raise KeyError(f"NPZ keys: {list(data.keys())} ??? expected 'X'.")
     return data["X"].astype(np.float32)
 
 
